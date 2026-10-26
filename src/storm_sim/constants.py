@@ -26,7 +26,7 @@ DEFAULT_INTENSITY: float = 0.5
 DEFAULT_MIN_DIST_MILES: float = 0.1
 
 #: Default maximum lightning strike distance in miles
-DEFAULT_MAX_DIST_MILES: float = 8.0
+DEFAULT_MAX_DIST_MILES: float = 3.0
 
 #: Peak strike rate per minute when storm intensity reaches 1.0
 DEFAULT_MAX_RATE_PER_MIN: float = 35.0
@@ -189,26 +189,26 @@ ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR: float = 11.0
 #: Acoustic boost applied at full storm intensity in dB
 INTENSITY_ACOUSTIC_BOOST_DB: float = 3.0
 
-#: Floor cutoff frequency for atmospheric low-pass filter (sub-bass rumbles)
-MIN_LPF_CUTOFF_HZ: float = 110.0
+#: Floor cutoff frequency for atmospheric low-pass filter (deep sub-bass rumbles)
+MIN_LPF_CUTOFF_HZ: float = 75.0
 
-#: Ceiling cutoff frequency for atmospheric low-pass filter (close snaps)
-MAX_LPF_CUTOFF_HZ: float = 14000.0
+#: Ceiling cutoff frequency for atmospheric low-pass filter (close low-midrange thunderclaps)
+MAX_LPF_CUTOFF_HZ: float = 420.0
 
 #: Reference numerator for distance-dependent low-pass filter cutoff calculation
-LPF_REFERENCE_NUMERATOR_HZ: float = 8000.0
+LPF_REFERENCE_NUMERATOR_HZ: float = 280.0
 
 #: High-frequency roll-off factor per mile of distance
-LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.40
+LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.15
 
 #: IIR Butterworth low-pass filter order (12 dB/octave attenuation)
 BUTTERWORTH_FILTER_ORDER: int = 2
 
-#: Upper distance limit (miles) for Tier 1: dry overhead thunderclaps
-TIER_CLOSE_MAX_MILES: float = 1.2
+#: Upper distance limit (miles) for Tier 1: close overhead thunderclaps
+TIER_CLOSE_MAX_MILES: float = 0.85
 
 #: Upper distance limit (miles) for Tier 2: rolling mid-distance thunder
-TIER_MID_MAX_MILES: float = 3.2
+TIER_MID_MAX_MILES: float = 2.0
 
 #: Target peak normalized amplitude for audio sample banks
 SAMPLE_PEAK_NORMALIZE_TARGET: float = 0.90
@@ -236,9 +236,9 @@ SYNTH_THUNDER_DURATIONS_SEC: Dict[str, float] = {
 
 #: Fixed low-pass filter cutoff frequencies in Hz for procedural thunder synthesis
 SYNTH_THUNDER_LPF_HZ: Dict[str, float] = {
-    "close": 4500.0,
-    "mid": 1200.0,
-    "far": 280.0,
+    "close": 340.0,
+    "mid": 210.0,
+    "far": 120.0,
 }
 
 #: Total duration in seconds of the procedural seamless rain loop

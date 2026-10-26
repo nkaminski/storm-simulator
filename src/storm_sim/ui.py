@@ -16,7 +16,6 @@ import numpy as np
 from .constants import (
     ABSOLUTE_MAX_DIST_MILES,
     ABSOLUTE_MIN_DIST_MILES,
-    CLICK_STRIKE_DEFAULT_DIST_MILES,
     DEFAULT_FPS,
     LED_CANVAS_HEIGHT,
     MAX_DISPLAY_SEGMENTS,
@@ -124,7 +123,7 @@ class StormDesktopUI:
         style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6)
 
     def _build_layout(self) -> None:
-        """Constructs visualizer canvas, parameter sliders, triggers, and telemetry."""
+        """Constructs visualizer canvas, parameter sliders, and live telemetry."""
         # 1. Top LED Array Visualizer Section
         top_frame = self.ttk.Frame(self.root, padding=(16, 12, 16, 6))
         top_frame.pack(fill=self.tk.X)
@@ -133,7 +132,7 @@ class StormDesktopUI:
         header_row.pack(fill=self.tk.X, pady=(0, 6))
         self.ttk.Label(
             header_row,
-            text="E1.31 MONOCHROME WHITE PIXEL ARRAY (CLICK STRIP TO TRIGGER STRIKE AT EPICENTER)",
+            text="E1.31 MONOCHROME WHITE PIXEL ARRAY",
             style="Header.TLabel",
         ).pack(side=self.tk.LEFT)
         self.lbl_fps_status = self.ttk.Label(
@@ -150,10 +149,8 @@ class StormDesktopUI:
             bg=UI_CANVAS_BG,
             highlightthickness=1,
             highlightbackground="#334155",
-            cursor="crosshair",
         )
         self.canvas.pack(fill=self.tk.X)
-        self.canvas.bind("<Button-1>", self._on_canvas_click)
 
         # 2. Main Controls & Telemetry Split
         mid_frame = self.ttk.Frame(self.root, padding=(16, 8, 16, 12))
@@ -264,7 +261,7 @@ class StormDesktopUI:
         else:
             self.lbl_rate_val.configure(text=f"{init_rate:.1f} (Auto)")
 
-        # Right Column: Live Telemetry & Action Triggers
+        # Right Column: Live Telemetry
         right_panel = self.ttk.Frame(
             mid_frame, style="Panel.TFrame", padding=14, width=360
         )
@@ -273,37 +270,15 @@ class StormDesktopUI:
 
         self.ttk.Label(
             right_panel,
-            text="MANUAL TRIGGERS & TELEMETRY",
+            text="LIVE TELEMETRY",
             font=("Segoe UI", 11, "bold"),
             foreground=UI_ACCENT_BLUE,
         ).pack(anchor=self.tk.W, pady=(0, 10))
 
-        btn_grid = self.ttk.Frame(right_panel, style="Panel.TFrame")
-        btn_grid.pack(fill=self.tk.X, pady=(0, 12))
-
-        self.ttk.Button(
-            btn_grid,
-            text="⚡ Random Strike",
-            command=lambda: self.coordinator.trigger_strike_now(),
-        ).pack(fill=self.tk.X, pady=3)
-        self.ttk.Button(
-            btn_grid,
-            text="💥 Overhead Bolt (0.15 mi, Center)",
-            command=lambda: self.coordinator.trigger_strike_now(0.15, 0.5),
-        ).pack(fill=self.tk.X, pady=3)
-        self.ttk.Button(
-            btn_grid,
-            text="🌩️ Distant Sheet Flash (5.5 mi)",
-            command=lambda: self.coordinator.trigger_strike_now(5.5, None),
-        ).pack(fill=self.tk.X, pady=3)
-        self.ttk.Button(
-            btn_grid, text="🛑 Kill Storm (Intensity = 0)", command=self._kill_storm
-        ).pack(fill=self.tk.X, pady=3)
-
         self.lbl_telemetry = self.ttk.Label(
             right_panel, text="", style="Muted.TLabel", justify=self.tk.LEFT
         )
-        self.lbl_telemetry.pack(fill=self.tk.X, pady=(8, 8))
+        self.lbl_telemetry.pack(fill=self.tk.X, pady=(4, 8))
 
         self.ttk.Label(
             right_panel,
@@ -312,7 +287,7 @@ class StormDesktopUI:
         ).pack(anchor=self.tk.W, pady=(6, 4))
         self.txt_queue = self.tk.Text(
             right_panel,
-            height=10,
+            height=14,
             bg=UI_CANVAS_BG,
             fg="#38BDF8",
             font=("Consolas", 9),
@@ -355,17 +330,6 @@ class StormDesktopUI:
         )
         scale.pack(fill=self.tk.X, pady=(2, 0))
         return scale, val_lbl
-
-    def _on_canvas_click(self, event) -> None:
-        """Triggered when the user clicks the simulated LED canvas: fires strike at mouse X position."""
-        width = max(1, self.canvas.winfo_width())
-        epicenter = max(0.0, min(1.0, event.x / width))
-        if self.state.is_zero_intensity:
-            self.var_intensity.set(0.25)
-            self.state.intensity = 0.25
-        self.coordinator.trigger_strike_now(
-            forced_dist=CLICK_STRIKE_DEFAULT_DIST_MILES, forced_epicenter=epicenter
-        )
 
     def _on_intensity_change(self, val: float) -> None:
         """Callback for master intensity slider changes."""

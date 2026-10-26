@@ -97,7 +97,7 @@ storm-sim-ui
 | `--channel-map` | str | `None` | Custom channel map: `<sim_ch>:<e131_ch>,...` (e.g. `0:1,1:2,2:3,3:4`) |
 | `--universe` | int | `1` | Starting E1.31 DMX universe |
 | `--min-dist` | float | `0.1` | Minimum strike distance (miles) |
-| `--max-dist` | float | `8.0` | Maximum strike distance (miles) |
+| `--max-dist` | float | `3.0` | Maximum strike distance (miles) |
 | `--rate` | float | `None` | Manual override: strikes per minute |
 | `--rain` | float | `None` | Manual override: background rain level [0.0 - 1.0] |
 | `--brightness` | float | `1.0` | Master lighting ceiling scalar [0.0 - 1.0] |

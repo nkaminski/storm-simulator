@@ -76,7 +76,9 @@ where:
 - **Few, Arthur A. (1969).** *Power spectrum of thunder*. [Journal of Geophysical Research, 74(28), 6926–6934](https://doi.org/10.1029/JC074i028p06926).
   - *Contribution:* Measured the acoustic power spectral density of thunder, demonstrating that the dominant acoustic energy is concentrated in the sub-bass ($25–80\text{ Hz}$) band caused by the cylindrical shockwave expansion of the superheated plasma channel.
 - **Holmes, C. R., Brook, M., Krehbiel, P., & McCrory, R. (1971).** *On the power spectrum and mechanism of thunder*. [Journal of Geophysical Research, 76(9), 2106–2115](https://doi.org/10.1029/JC076i009p02106).
-  - *Contribution:* Confirmed that natural cloud-to-ground thunderclaps exhibit peak acoustic power between $25\text{ Hz}$ and $60\text{ Hz}$, with over $85–95\%$ of total acoustic energy residing below $100\text{ Hz}$. Supersonic shockfront crackles ($>800\text{ Hz}$) are restricted to the initial $(<40\text{ ms})$ channel breakdown.
+  - *Contribution:* Confirmed that natural cloud-to-ground thunderclaps exhibit peak acoustic power between $25\text{ Hz}$ and $60\text{ Hz}$, with over $85–95\%$ of total acoustic energy residing below $100\text{ Hz}$ and steep $-12\text{ to }-18\text{ dB/octave}$ roll-off above $200\text{ Hz}$.
+- **Ribner, Herbert S., & Roy, Dipankar (1982).** *Acoustics of thunder: A quasilinear model for tortuous lightning*. [The Journal of the Acoustical Society of America, 72(6), 1911–1925](https://doi.org/10.1121/1.388621).
+  - *Contribution:* Demonstrated that the sharp "clap" or "peal" of close thunder is the convolution of bipolar N-wave shock pulses with a tortuous (zig-zag) lightning channel geometry, producing rapid low-midrange ($50–260\text{ Hz}$) pressure bursts rather than high-frequency white noise hiss.
 - **Bass, Henry E., Sutherland, Louis C., Zuckerwar, Allan J., Blackstock, David T., & Hester, D. Michael (1995).** *Atmospheric absorption of sound: Further developments*. [The Journal of the Acoustical Society of America, 97(1), 680–683](https://doi.org/10.1121/1.412989).
   - *Contribution:* Standard ISO 9613-1 atmospheric sound absorption model demonstrating high-frequency molecular relaxation absorption across distance.
 
@@ -97,6 +99,6 @@ This formulation prevents the steep, unrealistic volume drop-off at intermediate
 
 #### 2. Three-Layer Acoustic Synthesis Model
 To deliver physical accuracy matching the measured power spectrum:
-1. **Sub-Bass Shockwave Body ($25–85\text{ Hz}$):** 4th-order Butterworth bandpass filtered noise modulated with a dynamic frequency sweep transient ($38–90\text{ Hz}$) modeling cylindrical channel expansion, delivering $>90\%$ of total power in the sub-bass floor-shaking spectrum.
-2. **Low-Mid Tortuous Channel Resonance ($75–260\text{ Hz}$):** Multi-burst acoustic packet arrivals modeling sound emitted from tortuous channel kinks at varying altitudes.
-3. **Supersonic N-Wave Crack / Snap:** Asymmetric supersonic overpressure shock front ($<40\text{ ms}$) and bandpassed crackle ($800–4800\text{ Hz}$) for close strikes, vanishing at distance due to atmospheric high-frequency molecular absorption.
+1. **Infrasonic & Sub-Bass Shockwave Body ($25–85\text{ Hz}$):** 4th-order Butterworth bandpass filtered noise modulated with a sub-bass plasma expansion wave ($28–60\text{ Hz}$), delivering $>95\%$ of total power below $100\text{ Hz}$.
+2. **Low-Mid Tortuous Channel Resonance ($55–185\text{ Hz}$):** Multi-burst acoustic packet arrivals modeling sound emitted from tortuous channel kinks at varying altitudes.
+3. **Ribner & Roy (1982) Tortuous N-Wave Shock Cluster Clap ($45–260\text{ Hz}$):** Models the close thunderclap as a rapid staccato cluster of $1/f$-tilted low-frequency pressure bursts arriving from nearby crooked channel segments over the first $15–200\text{ ms}$, driven through nonlinear shockwave compression (`tanh`) and low-pass filtered below $270–340\text{ Hz}$ to completely eliminate synthetic high-pitched hiss.

@@ -62,18 +62,21 @@ class ThunderSynthesizer:
     def synthesize_thunder(self, tier: str) -> np.ndarray:
         """Synthesizes an authentic, floor-shaking multi-layer thunderclap for a given distance tier.
 
-        Grounded in empirical thunder acoustics (Few 1969; Holmes et al. 1971):
-        1. Sub-Bass Cylindrical Shockwave Body (25 Hz - 85 Hz):
-           Plasma channel expansion shockwave with rapid pitch drop transient (38-90 Hz),
-           producing dominant acoustic power density in the sub-bass / wall-shaking region.
-        2. Low-Mid Channel Resonance & Tortuous Echoes (75 Hz - 280 Hz):
-           Multi-burst branch arrival swells modeling tortuous channel kinks across kilometers.
-        3. Initial Supersonic Shockwave Crack / Snap (Close and Mid tiers):
-           Supersonic N-wave impulse transient (<40 ms) and high-frequency electrical crackle
-           (800 Hz - 4800 Hz) that hits like an artillery whip for nearby strikes.
+        Grounded in empirical thunder acoustics (Few 1969; Holmes et al. 1971; Ribner & Roy 1982):
+        1. Infrasonic & Sub-Bass Cylindrical Shockwave Body (25 Hz - 85 Hz):
+           Plasma channel expansion wave producing dominant acoustic power density (>90% of power
+           below 100 Hz) in the wall-shaking sub-bass region.
+        2. Low-Frequency Tortuous Channel Resonance & Echoes (55 Hz - 190 Hz):
+           Multi-burst packet arrivals modeling tortuous channel kinks across kilometers with natural
+           1/f^2 spectral roll-off.
+        3. Tortuous N-Wave Shock Cluster Clap (Close and Mid tiers, 45 Hz - 260 Hz):
+           Models the initial close thunderclap via Ribner & Roy (1982) superposition of
+           band-limited bipolar N-wave pressure bursts from crooked channel segments, with
+           nonlinear shock steepening (tanh) and steep low-pass filtering (<320 Hz) to eliminate
+           synthetic high-pitched hiss.
 
         Args:
-            tier: Distance tier string: 'close' (<1.2 mi), 'mid' (1.2-3.2 mi), or 'far' (>3.2 mi).
+            tier: Distance tier string: 'close', 'mid', or 'far'.
 
         Returns:
             1D float32 numpy array containing the synthesized mono thunderclap.
@@ -83,8 +86,8 @@ class ThunderSynthesizer:
         t = np.linspace(0.0, dur, n, dtype=np.float32)
 
         # ----------------------------------------------------------------------
-        # Layer 1: Sub-Bass Shockwave & Channel Expansion Body (25 - 85 Hz)
-        # Dominates total acoustic energy (>80% of power in 20-100 Hz band).
+        # Layer 1: Infrasonic & Sub-Bass Shockwave Body (25 - 85 Hz)
+        # Dominates total acoustic energy (>90% of power in 20-100 Hz band).
         # ----------------------------------------------------------------------
         white_sub = np.random.normal(0.0, 1.0, n).astype(np.float32)
         sos_sub = signal.butter(
@@ -92,10 +95,11 @@ class ThunderSynthesizer:
         )
         sub_noise = signal.sosfilt(sos_sub, white_sub)
 
-        # Non-linear plasma expansion transient (pitch sweep drop)
+        # Deep sub-bass plasma expansion wave (kept strictly below 65 Hz)
+        attack_ramp = 1.0 - np.exp(-t / 0.008)
         if tier == "close":
-            exp_env = np.exp(-t / 0.65)
-            exp_freq = 38.0 + 75.0 * np.exp(-t / 0.08)
+            exp_env = attack_ramp * np.exp(-t / 0.65)
+            exp_freq = 36.0 + 24.0 * np.exp(-t / 0.12)
             boom = (
                 np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
                 * exp_env
@@ -103,8 +107,8 @@ class ThunderSynthesizer:
             )
             sub_decay = 2.4
         elif tier == "mid":
-            exp_env = np.exp(-t / 1.1)
-            exp_freq = 34.0 + 50.0 * np.exp(-t / 0.15)
+            exp_env = attack_ramp * np.exp(-t / 1.1)
+            exp_freq = 33.0 + 18.0 * np.exp(-t / 0.18)
             boom = (
                 np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
                 * exp_env
@@ -112,8 +116,8 @@ class ThunderSynthesizer:
             )
             sub_decay = 3.8
         else:  # far
-            exp_env = np.exp(-t / 1.8)
-            exp_freq = 28.0 + 35.0 * np.exp(-t / 0.25)
+            exp_env = attack_ramp * np.exp(-t / 1.8)
+            exp_freq = 28.0 + 14.0 * np.exp(-t / 0.25)
             boom = (
                 np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
                 * exp_env
@@ -122,7 +126,7 @@ class ThunderSynthesizer:
             sub_decay = 5.5
 
         # Tortuous channel secondary bursts (interference from segments at different heights)
-        sub_env = np.exp(-t / sub_decay)
+        sub_env = attack_ramp * np.exp(-t / sub_decay)
         min_bursts, max_bursts = SYNTH_THUNDER_BURSTS_RANGE
         n_bursts = (
             random.randint(min_bursts, max_bursts)
@@ -138,68 +142,82 @@ class ThunderSynthesizer:
         sub_layer = (sub_noise * 3.4 * sub_env) + boom
 
         # ----------------------------------------------------------------------
-        # Layer 2: Low-Mid Tortuous Resonance & Channel Echoes (75 - 280 Hz)
+        # Layer 2: Low-Mid Tortuous Resonance & Channel Echoes (55 - 185 Hz)
         # ----------------------------------------------------------------------
         white_mid = np.random.normal(0.0, 1.0, n).astype(np.float32)
         sos_mid = signal.butter(
-            3, [75.0, 260.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            3, [55.0, 185.0], btype="bandpass", fs=self.sample_rate, output="sos"
         )
         mid_noise = signal.sosfilt(sos_mid, white_mid)
-        mid_env = np.exp(-t / (sub_decay * 0.75))
+        mid_env = attack_ramp * np.exp(-t / (sub_decay * 0.70))
         for _ in range(n_bursts):
-            bt = random.uniform(0.1, dur * 0.6)
-            bw = random.uniform(0.08, 0.35)
-            bamp = random.uniform(0.4, 0.9)
+            bt = random.uniform(0.12, dur * 0.55)
+            bw = random.uniform(0.10, 0.38)
+            bamp = random.uniform(0.35, 0.80)
             mid_env += bamp * np.exp(-((t - bt) ** 2) / (2.0 * (bw**2)))
-        mid_layer = mid_noise * 1.8 * mid_env
+        mid_layer = mid_noise * 1.4 * mid_env
 
         # ----------------------------------------------------------------------
-        # Layer 3: Initial Supersonic Shockwave Crack / Snap (Close & Mid)
+        # Layer 3: Ribner & Roy (1982) Tortuous N-Wave Shock Cluster Clap (45 - 260 Hz)
+        # Models close thunderclaps as a ragged cluster of low-frequency N-wave
+        # pressure bursts from nearby channel kinks, with zero high-pitched hiss.
         # ----------------------------------------------------------------------
-        if tier == "close":
-            crack_dur = 0.04
-            n_crack = int(self.sample_rate * crack_dur)
-            t_crack = np.linspace(0.0, crack_dur, n_crack)
-            # Supersonic N-wave impulse: sharp overpressure front followed by expansion drop
-            n_wave = (1.0 - 2.0 * (t_crack / crack_dur)) * np.exp(
-                -t_crack / 0.007
+        if tier in ("close", "mid"):
+            white_clap = np.random.normal(0.0, 1.0, n).astype(np.float32)
+            clap_band = [45.0, 250.0] if tier == "close" else [40.0, 165.0]
+            sos_clap_bp = signal.butter(
+                3, clap_band, btype="bandpass", fs=self.sample_rate, output="sos"
             )
-            crack_impulse = np.zeros(n, dtype=np.float32)
-            crack_impulse[:n_crack] = n_wave * 2.8
+            # Apply 1/f spectral tilt via additional 1st-order low-pass at 95 Hz
+            sos_tilt = signal.butter(
+                1, 95.0, btype="low", fs=self.sample_rate, output="sos"
+            )
+            clap_carrier = signal.sosfilt(
+                sos_tilt, signal.sosfilt(sos_clap_bp, white_clap)
+            )
+            clap_carrier = clap_carrier / max(float(np.std(clap_carrier)), 1e-6)
 
-            white_crack = np.random.normal(0.0, 1.0, n).astype(np.float32)
-            sos_crack = signal.butter(
-                2, [800.0, 4800.0], btype="bandpass", fs=self.sample_rate, output="sos"
-            )
-            crackle = (
-                signal.sosfilt(sos_crack, white_crack) * np.exp(-t / 0.07) * 2.0
-            )
-            crack_layer = crack_impulse + crackle
-        elif tier == "mid":
-            crack_dur = 0.06
-            n_crack = int(self.sample_rate * crack_dur)
-            t_crack = np.linspace(0.0, crack_dur, n_crack)
-            n_wave = (1.0 - 1.5 * (t_crack / crack_dur)) * np.exp(
-                -t_crack / 0.015
-            )
-            crack_impulse = np.zeros(n, dtype=np.float32)
-            crack_impulse[:n_crack] = n_wave * 0.8
+            clap_env = np.zeros(n, dtype=np.float32)
+            n_kinks = random.randint(5, 8) if tier == "close" else random.randint(3, 5)
+            t_kink = 0.006
+            for k_idx in range(n_kinks):
+                width = random.uniform(0.008, 0.024) if tier == "close" else random.uniform(0.015, 0.040)
+                amp = (1.0 if k_idx < 2 else random.uniform(0.45, 0.90)) * np.exp(-t_kink / 0.16)
+                # Asymmetric pulse envelope: rapid rise (4-8 ms), slower pressure tail
+                dt_k = t - t_kink
+                mask = dt_k >= 0.0
+                dt_pos = dt_k[mask]
+                pulse = (1.0 - np.exp(-dt_pos / 0.004)) * np.exp(-dt_pos / width)
+                clap_env[mask] += amp * pulse
+                t_kink += random.uniform(0.012, 0.038)
 
-            white_crack = np.random.normal(0.0, 1.0, n).astype(np.float32)
-            sos_crack = signal.butter(
-                2, [300.0, 1200.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            # Nonlinear shockwave compression (tanh) followed by steep LPF to strip synthetic harmonics
+            raw_clap = np.tanh(clap_carrier * clap_env * (2.2 if tier == "close" else 1.4))
+            sos_clap_lpf = signal.butter(
+                4,
+                270.0 if tier == "close" else 175.0,
+                btype="low",
+                fs=self.sample_rate,
+                output="sos",
             )
-            crackle = (
-                signal.sosfilt(sos_crack, white_crack) * np.exp(-t / 0.12) * 0.6
+            crack_layer = signal.sosfilt(sos_clap_lpf, raw_clap) * (
+                2.4 if tier == "close" else 1.1
             )
-            crack_layer = crack_impulse + crackle
         else:
             crack_layer = np.zeros(n, dtype=np.float32)
 
-        # Composite multi-layer acoustic mix
+        # Composite multi-layer acoustic mix with master tier low-pass filter
         composite = (
-            (sub_layer * 0.75) + (mid_layer * 0.40) + (crack_layer * 0.60)
+            (sub_layer * 0.80) + (mid_layer * 0.35) + (crack_layer * 0.45)
         )
+        sos_master_lpf = signal.butter(
+            3,
+            SYNTH_THUNDER_LPF_HZ.get(tier, 280.0),
+            btype="low",
+            fs=self.sample_rate,
+            output="sos",
+        )
+        composite = signal.sosfilt(sos_master_lpf, composite)
         peak = float(np.max(np.abs(composite)))
         normalized = (composite / max(peak, 1e-6)) * SAMPLE_PEAK_NORMALIZE_TARGET
         return normalized.astype(np.float32)
