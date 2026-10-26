@@ -71,6 +71,45 @@ class ThunderSynthesizer:
         self.sample_rate = sample_rate
         self.small_speakers = small_speakers
 
+    def _get_explosion_attack(self) -> Optional[np.ndarray]:
+        """Loads, extracts, and caches the authentic outdoor explosion attack transient."""
+        if hasattr(self, "_cached_explosion_attack"):
+            return self._cached_explosion_attack
+
+        candidates = [
+            Path("assets/explosion-outdoors-medium.wav"),
+            Path("explosion-outdoors-medium.wav"),
+            Path(__file__).resolve().parent.parent.parent / "explosion-outdoors-medium.wav",
+            Path(__file__).resolve().parent.parent.parent / "assets" / "explosion-outdoors-medium.wav",
+        ]
+        for p in candidates:
+            if p.is_file():
+                try:
+                    data, sr = sf.read(str(p))
+                    if data.ndim > 1:
+                        data = data[:, 0]
+                    pk_idx = int(np.argmax(np.abs(data)))
+                    start_idx = max(0, pk_idx - int(0.004 * sr))
+                    end_idx = start_idx + int(0.380 * sr)
+                    attack = data[start_idx:end_idx].copy().astype(np.float32)
+                    if sr != self.sample_rate:
+                        num_s = int(len(attack) * self.sample_rate / sr)
+                        attack = signal.resample(attack, num_s).astype(np.float32)
+                    fade_len = int(0.070 * self.sample_rate)
+                    attack[-fade_len:] *= 0.5 * (
+                        1.0 + np.cos(np.linspace(0, np.pi, fade_len, dtype=np.float32))
+                    )
+                    peak = float(np.max(np.abs(attack)))
+                    if peak > 0:
+                        attack /= peak
+                    self._cached_explosion_attack = attack
+                    return attack
+                except Exception as e:
+                    logger.debug("Failed reading explosion sound: %s", e)
+
+        self._cached_explosion_attack = None
+        return None
+
     def synthesize_thunder(self, tier: str) -> np.ndarray:
         """Synthesizes an authentic, floor-shaking multi-layer thunderclap for a given distance tier.
 
@@ -243,6 +282,16 @@ class ThunderSynthesizer:
         #     crackle gated to the leading edges of each shockwave kink, rolling off
         #     steeply above 2.4 kHz (<0.05% energy >3 kHz) to avoid white-noise hiss.
         # ----------------------------------------------------------------------
+        # Layer 3: Multi-Clap Dry Thunder Crack & Outdoor Pressure Shockwave
+        # Grounded in empirical analysis of dry-thunder3.wav & explosion-outdoors-medium.wav:
+        #   - Friedlander Bipolar Outdoor Shock Front: Razor-sharp pressure wave arrival
+        #     (positive compression peak + 2.2 ms ground reflection rarefaction).
+        #   - Multi-Clap Barrage (6 to 9 claps for close): Overlapping shock arrivals from
+        #     crooked channel kinks (Ribner & Roy 1982) delivering continuous explosive tearing.
+        #   - Low-Bark (90 - 250 Hz, Crest ~14): Visceral outdoor explosion body punch.
+        #   - Mid-Crack (250 - 700 Hz, Crest ~13): Dry, woody explosive crack body.
+        #   - High-Tear (700 - 2350 Hz, Crest ~16): Ripping air displacement.
+        # ----------------------------------------------------------------------
         if tier in ("close", "mid"):
             # Generate 3 band-limited carriers matching dry-thunder3.wav sub-bands
             w1 = np.random.normal(0.0, 1.0, n).astype(np.float32)
@@ -263,72 +312,120 @@ class ThunderSynthesizer:
             c_midc = signal.sosfilt(sos_midc, w2)
             c_tear = signal.sosfilt(sos_tear, w3)
 
-            # Smooth natural tearing modulation on high-tear band without isolated sample click spikes
+            # Smooth natural tearing modulation on high-tear band
             w_mod = np.random.normal(0.0, 1.0, n).astype(np.float32)
             sos_mod = signal.butter(
                 2, [45.0, 280.0], btype="bandpass", fs=self.sample_rate, output="sos"
             )
             grain_mod = np.abs(signal.sosfilt(sos_mod, w_mod))
             grain_mod = np.tanh(grain_mod / max(float(np.std(grain_mod)), 1e-6))
-            c_tear = c_tear * (0.55 + 0.90 * grain_mod)
+            c_tear = c_tear * (0.45 + 1.10 * grain_mod)
 
             env_bark = np.zeros(n, dtype=np.float32)
             env_midc = np.zeros(n, dtype=np.float32)
             env_tear = np.zeros(n, dtype=np.float32)
+            shock_layer = np.zeros(n, dtype=np.float32)
 
-            # Return-stroke shockwave claps:
-            # Primary strike (c_idx == 0) is MUCH louder than all subsequent secondary kinks/strokes
-            n_claps = len(boom_times) if boom_times else (1 if tier == "close" else 2)
+            # Multi-clap barrage: 6 to 9 claps (close) or 4 to 6 claps (mid)
+            n_claps = random.randint(6, 9) if tier == "close" else random.randint(4, 6)
+            t_clap = 0.08 if tier == "close" else 0.05
             for c_idx in range(n_claps):
-                t_clap = boom_times[c_idx] if c_idx < len(boom_times) else 0.0
                 dt_c = t - t_clap
-                mask_c = (dt_c >= 0.0) & (dt_c <= 0.75)
+                mask_c = (dt_c >= 0.0) & (dt_c <= 0.65)
                 dt_cp = dt_c[mask_c]
 
-                if c_idx == 0:
-                    # Dominant explosive primary crack (much louder than all other pulses)
-                    c_amp = 1.0
-                    w_bark = random.uniform(0.045, 0.080)
-                    w_midc = random.uniform(0.035, 0.065)
-                    w_tear = random.uniform(0.020, 0.038)
-                else:
-                    # Secondary return strokes are much softer (0.20-0.28) with subtle high tear
-                    c_amp = random.uniform(0.18, 0.28) * (0.65 ** c_idx)
-                    w_bark = random.uniform(0.028, 0.048)
-                    w_midc = random.uniform(0.020, 0.032)
-                    w_tear = random.uniform(0.008, 0.015)
+                # Main claps peak across primary tortuous kinks, then decay smoothly
+                c_amp = (
+                    random.uniform(0.85, 1.0)
+                    if c_idx in (0, 1, 2)
+                    else random.uniform(0.40, 0.75) * np.exp(-(c_idx - 2) / 3.2)
+                )
+                w_bark = random.uniform(0.040, 0.080)
+                w_midc = random.uniform(0.028, 0.058)
+                w_tear = random.uniform(0.016, 0.034)
 
-                env_bark[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.006)) * np.exp(-dt_cp / w_bark)
-                env_midc[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.005)) * np.exp(-dt_cp / w_midc)
-                env_tear[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.004)) * np.exp(-dt_cp / w_tear)
+                env_bark[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.003)) * np.exp(-dt_cp / w_bark)
+                env_midc[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.002)) * np.exp(-dt_cp / w_midc)
+                env_tear[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.0015)) * np.exp(-dt_cp / w_tear)
 
-            # Shape each band with soft-saturation to match dry-thunder3.wav crest factors (5.0 - 8.3)
+                # Friedlander outdoor pressure shockwave (ground truth from explosion-outdoors-medium.wav)
+                mask_s = (dt_c >= 0.0) & (dt_c < 0.045)
+                dt_s = dt_c[mask_s]
+                p_direct = (1.0 - dt_s / 0.0035) * np.exp(-dt_s / 0.005)
+                p_refl = np.zeros_like(dt_s)
+                mask_r = dt_s >= 0.0022
+                p_refl[mask_r] = (
+                    -0.42 * (1.0 - (dt_s[mask_r] - 0.0022) / 0.004)
+                    * np.exp(-(dt_s[mask_r] - 0.0022) / 0.007)
+                )
+                shock_layer[mask_s] += c_amp * (p_direct + p_refl)
+
+                t_clap += random.uniform(0.045, 0.095)
+
+            # Shape each band with soft-saturation to match outdoor explosion crest factors (10 - 15)
             sig_bark = np.tanh(
-                (c_bark / max(float(np.std(c_bark)), 1e-6)) * env_bark * 0.75
+                (c_bark / max(float(np.std(c_bark)), 1e-6)) * env_bark * 0.85
             )
             sig_bark = sig_bark / max(float(np.max(np.abs(sig_bark))), 1e-6)
 
             sig_midc = np.tanh(
-                (c_midc / max(float(np.std(c_midc)), 1e-6)) * env_midc * 0.80
+                (c_midc / max(float(np.std(c_midc)), 1e-6)) * env_midc * 0.85
             )
             sig_midc = sig_midc / max(float(np.max(np.abs(sig_midc))), 1e-6)
 
             sig_tear = np.tanh(
-                (c_tear / max(float(np.std(c_tear)), 1e-6)) * env_tear * 0.65
+                (c_tear / max(float(np.std(c_tear)), 1e-6)) * env_tear * 0.70
             )
             sig_tear = sig_tear / max(float(np.max(np.abs(sig_tear))), 1e-6)
 
+            shock_norm = shock_layer / max(float(np.max(np.abs(shock_layer))), 1e-6)
+
             if tier == "close":
-                crack_raw = (sig_bark * 0.85) + (sig_midc * 0.68) + (sig_tear * 0.56)
+                crack_raw = (
+                    (sig_bark * 0.85)
+                    + (sig_midc * 0.65)
+                    + (sig_tear * 0.50)
+                    + (shock_norm * 0.42)
+                )
                 cutoff_crack = 2450.0
             else:  # mid
-                crack_raw = (sig_bark * 0.55) + (sig_midc * 0.35) + (sig_tear * 0.16)
+                crack_raw = (
+                    (sig_bark * 0.55)
+                    + (sig_midc * 0.35)
+                    + (sig_tear * 0.16)
+                    + (shock_norm * 0.22)
+                )
                 cutoff_crack = 1050.0
 
             sos_crack_lpf = signal.butter(
                 4, cutoff_crack, btype="low", fs=self.sample_rate, output="sos"
             )
             crack_layer = signal.sosfilt(sos_crack_lpf, crack_raw)
+
+            # Blend authentic outdoor explosion attack transient for close overhead strikes (< 1 mile).
+            # As distance increases past 1 mile (mid tier), atmospheric molecular relaxation absorption
+            # dissolves the shock front, transitioning into traditional rolling thunder.
+            exp_attack = self._get_explosion_attack()
+            if exp_attack is not None:
+                att_len = len(exp_attack)
+                t_start = int(0.02 * self.sample_rate)
+                if t_start + att_len < n:
+                    if tier == "close":
+                        # Full razor-sharp blast wave attack (< 1 mile)
+                        crack_layer[t_start : t_start + att_len] = (
+                            crack_layer[t_start : t_start + att_len] * 0.45
+                            + exp_attack * 0.88
+                        )
+                    else:  # mid tier (> 1 mile)
+                        # Absorbed by distance: traditional thunder dominates, explosion reduced & rounded
+                        sos_att = signal.butter(
+                            2, 320.0, btype="low", fs=self.sample_rate, output="sos"
+                        )
+                        att_soft = signal.sosfilt(sos_att, exp_attack)
+                        crack_layer[t_start : t_start + att_len] = (
+                            crack_layer[t_start : t_start + att_len] * 0.85
+                            + att_soft * 0.18
+                        )
         else:
             crack_layer = np.zeros(n, dtype=np.float32)
 
