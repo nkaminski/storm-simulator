@@ -26,6 +26,31 @@ $$\Phi(d) = \Phi_0 \cdot e^{-\alpha_{\text{ext}} d}$$
 - **McCartney, Earl J. (1976).** *Optics of the Atmosphere: Scattering by Molecules and Particles*. John Wiley & Sons, New York.
   - *Contribution:* Comprehensive treatment of Rayleigh and Mie scattering through atmospheric fog, rain, and aerosols.
 
+### Convective Core Proximity & Non-linear Strike Distance Warping
+- **MacGorman, Donald R., & Rust, W. David (1998).** *The Electrical Nature of Storms*. Oxford University Press, New York.
+  - *Contribution:* Analyzed spatial distributions of cloud-to-ground lightning flashes relative to thunderstorm updrafts, convective cores, and precipitation shafts, demonstrating that high-intensity convective cores concentrate strike densities within close radial proximity to the storm center.
+
+#### Non-linear Distance Distribution Formulation
+To capture the meteorological reality where mild storms remain on the horizon while severe convective systems position the downburst core directly over the observer, strike distance $d$ is sampled via an asymmetric Beta distribution coupled with intensity-driven non-linear power-law warping:
+
+$$\alpha(s) = 1.0 + W_{\text{dist}} \cdot (1 - s)^{\gamma_\alpha}$$
+$$\beta(s) = 1.0 + W_{\text{dist}} \cdot s^{\gamma_\beta}$$
+
+where $s \in [0.0, 1.0]$ is storm intensity, $W_{\text{dist}} = 4.5$ (`BETA_DIST_SKEW_WEIGHT`), $\gamma_\alpha = 1.4$ (`DISTANCE_ALPHA_GAMMA`), and $\gamma_\beta = 0.8$ (`DISTANCE_BETA_GAMMA`).
+
+A severity-dependent compression power $\lambda(s)$ is applied to the random Beta draw $u \sim \text{Beta}(\alpha, \beta)$:
+
+$$\lambda(s) = 1.0 + (\kappa_{\text{warp}} - 1.0) \cdot s^{1.5}$$
+$$u_{\text{norm}} = u^{\lambda(s)}$$
+$$d = d_{\text{min}} + u_{\text{norm}} \cdot (d_{\text{max}} - d_{\text{min}})$$
+
+where $\kappa_{\text{warp}} = 2.0$ (`DISTANCE_NONLINEAR_WARP_EXPONENT`).
+
+This non-linear formulation ensures:
+1. **Light storms ($s \le 0.2$):** Mean distance $\approx 1.95\text{ mi}$, keeping strikes safely on the horizon with long acoustic arrival lags ($> 9\text{ s}$).
+2. **Moderate storms ($s \approx 0.5$):** Mean distance $\approx 1.08\text{ mi}$, transitioning smoothly between horizon rumbles and closer strikes.
+3. **Severe storms ($s \ge 0.8$):** Nonlinearly compresses $\ge 85–95\%$ of strikes into the immediate vicinity ($d \le 0.40\text{ mi}$), triggering sub-second flash-to-bang acoustic delays ($< 1.8\text{ s}$), full 3kW optical saturation, and explosive Friedlander shock fronts.
+
 ---
 
 ## 2. Lightning Radiative Transfer & Multi-Stroke Channel Physics

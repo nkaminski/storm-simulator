@@ -71,9 +71,15 @@ INTENSITY_RATE_EXPONENT: float = 2.2
 #: rain = intensity ^ INTENSITY_RAIN_EXPONENT
 INTENSITY_RAIN_EXPONENT: float = 1.5
 
-#: Weight parameter for Beta distribution: skews strike distances toward close
-#: strikes during intense storms, and toward far strikes during light storms
-BETA_DIST_SKEW_WEIGHT: float = 3.0
+#: Base weight parameter for distance Beta distribution
+BETA_DIST_SKEW_WEIGHT: float = 4.5
+
+#: Non-linear distance compression power applied as storm severity approaches 1.0
+DISTANCE_NONLINEAR_WARP_EXPONENT: float = 2.0
+
+#: Asymmetric curvature exponents for alpha and beta shape parameters
+DISTANCE_ALPHA_GAMMA: float = 1.4
+DISTANCE_BETA_GAMMA: float = 0.8
 
 #: Maximum number of secondary return strokes added to a strike at peak intensity
 MAX_EXTRA_STROKES_AT_PEAK: int = 5

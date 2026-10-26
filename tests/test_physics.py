@@ -50,3 +50,48 @@ def test_atmospheric_lpf():
 
     # Distant strike high frequencies are attenuated (lower cutoff Hz)
     assert close_strike.audio_lpf_hz > far_strike.audio_lpf_hz
+
+
+def test_distance_distribution_skews_closer_with_intensity():
+    import random
+    random.seed(42)
+
+    light_state = StormState(intensity=0.15, min_dist_miles=0.1, max_dist_miles=3.0)
+    severe_state = StormState(intensity=0.90, min_dist_miles=0.1, max_dist_miles=3.0)
+
+    n_samples = 1000
+    light_distances = [
+        PhysicsEngine.generate_strike(light_state, now=0.0).distance_miles
+        for _ in range(n_samples)
+    ]
+    severe_distances = [
+        PhysicsEngine.generate_strike(severe_state, now=0.0).distance_miles
+        for _ in range(n_samples)
+    ]
+
+    # Verify all distances remain within bounds
+    for d in light_distances:
+        assert 0.1 <= d <= 3.0
+    for d in severe_distances:
+        assert 0.1 <= d <= 3.0
+
+    mean_light = sum(light_distances) / n_samples
+    mean_severe = sum(severe_distances) / n_samples
+
+    sorted_light = sorted(light_distances)
+    sorted_severe = sorted(severe_distances)
+    median_light = sorted_light[n_samples // 2]
+    median_severe = sorted_severe[n_samples // 2]
+
+    # Light storm distances should stay predominantly distant
+    assert mean_light > 1.8
+    assert median_light > 1.8
+
+    # Severe storm distances must nonlinearly err close to the observer (< 0.5 mi mean)
+    assert mean_severe < 0.5
+    assert median_severe < 0.35
+
+    # Over 85% of severe strikes should be under 0.85 miles
+    close_severe_count = sum(1 for d in severe_distances if d < 0.85)
+    assert close_severe_count / n_samples > 0.85
+

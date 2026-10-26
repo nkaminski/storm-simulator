@@ -19,6 +19,9 @@ from .constants import (
     BASE_OPTICAL_EXTINCTION,
     BASE_SPATIAL_SIGMA,
     BETA_DIST_SKEW_WEIGHT,
+    DISTANCE_ALPHA_GAMMA,
+    DISTANCE_BETA_GAMMA,
+    DISTANCE_NONLINEAR_WARP_EXPONENT,
     INTENSITY_ACOUSTIC_BOOST_DB,
     INTER_STROKE_GAP_RANGE_SEC,
     LPF_DISTANCE_ROLLOFF_FACTOR,
@@ -68,18 +71,20 @@ class PhysicsEngine:
             LPF cutoff, gain scalar, and stereo pan position.
         """
         # ----------------------------------------------------------------------
-        # 1. Distance sampling via Intensity-Skewed Beta Distribution
+        # 1. Distance sampling via Non-linear Intensity-Skewed Beta Distribution
         # ----------------------------------------------------------------------
-        # When intensity s -> 1.0, beta increases and alpha decreases, skewing
-        # random draws toward the minimum distance (frequent close overhead bolts).
-        # When intensity s -> 0.0, alpha increases, pushing strikes to the horizon.
+        # As storm severity s increases, strike distances nonlinearly err closer
+        # toward the observer (core downburst proximity). Light storms maintain
+        # horizon activity, while severe storms aggressively cluster near min_dist_miles.
         if forced_dist is not None:
             d = max(ABSOLUTE_MIN_DIST_MILES, forced_dist)
         else:
             s = max(0.0, min(1.0, state.intensity))
-            alpha = 1.0 + BETA_DIST_SKEW_WEIGHT * (1.0 - s)
-            beta = 1.0 + BETA_DIST_SKEW_WEIGHT * s
-            norm_d = random.betavariate(alpha, beta)
+            alpha = 1.0 + BETA_DIST_SKEW_WEIGHT * ((1.0 - s) ** DISTANCE_ALPHA_GAMMA)
+            beta = 1.0 + BETA_DIST_SKEW_WEIGHT * (s ** DISTANCE_BETA_GAMMA)
+            raw_u = random.betavariate(alpha, beta)
+            warp = 1.0 + (DISTANCE_NONLINEAR_WARP_EXPONENT - 1.0) * (s ** 1.5)
+            norm_d = raw_u ** warp
             d = state.min_dist_miles + norm_d * (
                 state.max_dist_miles - state.min_dist_miles
             )
