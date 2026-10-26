@@ -19,24 +19,12 @@ Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator wi
 
 ## Scientific Citations & Model References
 
-The mathematical models for optical attenuation, atmospheric extinction, and acoustic propagation are grounded in established atmospheric physics literature:
+The mathematical models for optical attenuation, atmospheric extinction, and acoustic propagation are grounded in established atmospheric physics literature. For complete bibliographic citations, paper links, and mathematical derivations, see [MODEL_CITATIONS.md](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md).
 
-1. **Beer-Lambert Optical Extinction & Rainfall Scattering:**
-   - **Bouguer-Lambert-Beer Law:**
-     - Bouguer, P. (1729). *Essai d'optique sur la gradation de la lumière* [*Optical Essay on the Gradation of Light*]. Claude Jombert, Paris.
-     - Lambert, J. H. (1760). *Photometria, sive de mensura et gradibus luminis, colorum et umbrae* [*Photometry, or On the Measure and Gradations of Light, Colors, and Shadow*]. Klett, Augsburg.
-     - Beer, A. (1852). *Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten* [*Determination of the Absorption of Red Light in Colored Liquids*], [Annalen der Physik und Chemie, 86(5), 78–88](https://doi.org/10.1002/andp.18521620505).
-   - **Atmospheric Extinction & Hydrometeor Scattering:**
-     - Atlas, D. (1953). *Optical extinction by rainfall*, [Journal of Meteorology, 10(6), 486–488](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
-     - Koschmieder, H. (1924). *Theorie der horizontalen Sichtweite* [*Theory of Horizontal Visibility*], Beiträge zur Physik der freien Atmosphäre, 12, 33–53 (Koschmieder's visual extinction law).
-     - McCartney, E. J. (1976). *Optics of the Atmosphere: Scattering by Molecules and Particles*. John Wiley & Sons, New York.
-2. **Lightning Optical Radiative Transfer & Multi-Stroke Channel Physics:**
-   - Uman, M. A. (1987). *The Lightning Discharge*. Academic Press / Dover Publications.
-   - Thomason, L. W., & Krider, E. P. (1982). *The effects of clouds on the light produced by lightning*, [Journal of the Atmospheric Sciences, 39(9), 2051–2065](https://doi.org/10.1175/1520-0469(1982)039%3C2051:TEOCOT%3E2.0.CO;2).
-   - Krider, E. P., & Guo, C. (1983). *The peak radiant power and energy in lightning return strokes*, [Journal of Geophysical Research, 88(C13), 8623–8634](https://doi.org/10.1029/JC088iC13p08623).
-3. **Acoustic Wave Propagation & Atmospheric Absorption:**
-   - Bass, H. E., Sutherland, L. C., Zuckerwar, A. J., Blackstock, D. T., & Hester, D. M. (1995). *Atmospheric absorption of sound: Further developments*, [The Journal of the Acoustical Society of America, 97(1), 680–683](https://doi.org/10.1121/1.412989) (ISO 9613-1 standard).
-   - Few, A. A. (1969). *Power spectrum of thunder*, [Journal of Geophysical Research, 74(28), 6926–6934](https://doi.org/10.1029/JC074i028p06926).
+Key foundation papers include:
+- **Optical Extinction & Rainfall Scattering:** [Bouguer (1729)](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Lambert (1760)](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Beer (1852)](https://doi.org/10.1002/andp.18521620505), and [Atlas (1953)](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
+- **Lightning Radiative Transfer & Multi-Stroke Physics:** Uman (1987), [Thomason & Krider (1982)](https://doi.org/10.1175/1520-0469(1982)039%3C2051:TEOCOT%3E2.0.CO;2), and [Krider & Guo (1983)](https://doi.org/10.1029/JC088iC13p08623).
+- **Acoustic Wave Propagation & Atmospheric Absorption:** [Bass et al. (1995)](https://doi.org/10.1121/1.412989) (ISO 9613-1) and [Few (1969)](https://doi.org/10.1029/JC074i028p06926).
 
 ---
 
@@ -45,7 +33,8 @@ The mathematical models for optical attenuation, atmospheric extinction, and aco
 ```text
 storm-sim/
 ├── pyproject.toml          # PEP-621 build configuration with optional [ui, test]
-├── README.md               # User guide, OSC table, and model documentation
+├── README.md               # User guide, OSC table, and quick start
+├── MODEL_CITATIONS.md      # Scientific literature citations & derivations
 ├── SFX_GUIDE.md            # Sound Effects (SFX) asset curation & Freesound catalog
 ├── assets/                 # Audio sample directories
 │   ├── close/              # Tier 1 (<1.2 mi) dry, violent thunderclaps
