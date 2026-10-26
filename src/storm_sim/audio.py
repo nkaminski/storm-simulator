@@ -1,4 +1,9 @@
-"""audio.py - High-performance polyphonic audio mixer with Butterworth LPF, spatial stereo panning, and AOT asset loading."""
+"""audio.py - High-performance polyphonic audio mixer with Butterworth LPF, spatial stereo panning, and AOT asset loading.
+
+Manages continuous stereo background rain ambience and polyphonic thunder voice mixing.
+Applies real-time 2nd-order Butterworth low-pass filtering and constant-power stereo
+panning aligned with lightning visual epicenters.
+"""
 
 from __future__ import annotations
 import functools
@@ -33,7 +38,15 @@ logger = logging.getLogger("storm_sim.audio")
 
 @functools.lru_cache(maxsize=128)
 def _get_cached_butterworth_sos(cutoff_hz_quantized: int, sample_rate: int) -> np.ndarray:
-    """Caches Butterworth SOS filter coefficients ahead-of-time to avoid real-time filter design."""
+    """Caches Butterworth SOS filter coefficients ahead-of-time to avoid real-time filter design.
+
+    Args:
+        cutoff_hz_quantized: Cutoff frequency quantized to nearest 10 Hz for cache hits.
+        sample_rate: Audio sample rate in Hz.
+
+    Returns:
+        Second-order sections (SOS) filter coefficients matrix.
+    """
     return signal.butter(
         BUTTERWORTH_FILTER_ORDER,
         cutoff_hz_quantized,
@@ -46,9 +59,25 @@ def _get_cached_butterworth_sos(cutoff_hz_quantized: int, sample_rate: int) -> n
 class AudioEngine:
     """Real-time polyphonic audio mixer with Butterworth LPF, stereo panning,
     and automatic procedural synthesis fallback if WAV files are absent.
+
+    Attributes:
+        state: Reference to the shared StormState instance.
+        assets_dir: Path to directory containing audio sample tiers.
+        lock: Threading lock protecting the active voices list from callback concurrency.
+        active_voices: List of tuples (stereo_buffer, playback_cursor_index).
+        thunder_bank: Dictionary mapping tiers ('close', 'mid', 'far') to lists of mono buffers.
+        rain_loop: Stereo contiguous float32 buffer of seamless ambient rain audio.
+        rain_cursor: Playback sample cursor within the seamless rain loop.
+        stream: Optional sounddevice.OutputStream for hardware audio output.
     """
 
     def __init__(self, state: StormState, assets_dir: Optional[Path] = None):
+        """Initializes the audio mixer, loads or synthesizes assets, and opens the audio stream.
+
+        Args:
+            state: Shared StormState configuration.
+            assets_dir: Directory containing 'close', 'mid', 'far' subfolders and rain WAV.
+        """
         self.state = state
         self.assets_dir = assets_dir
         self.lock = threading.Lock()
@@ -78,7 +107,12 @@ class AudioEngine:
             self.stream = None
 
     def _load_or_synthesize_assets(self) -> None:
-        """Loads WAV files from disk or synthesizes acoustic models on startup."""
+        """Loads WAV files from disk or synthesizes acoustic models on startup.
+
+        Scans the assets directory for 'close', 'mid', and 'far' subdirectories.
+        Normalizes samples to peak baseline and resamples to AUDIO_SAMPLE_RATE.
+        If files are missing, invokes ThunderSynthesizer to generate realistic fallback models.
+        """
         if self.assets_dir and self.assets_dir.exists():
             for tier in ("close", "mid", "far"):
                 tier_dir = self.assets_dir / tier
@@ -117,6 +151,7 @@ class AudioEngine:
             self.rain_loop = synth.synthesize_rain_loop(SYNTH_RAIN_LOOP_DURATION_SEC)
 
     def start(self) -> None:
+        """Starts the audio output stream."""
         if self.stream is not None:
             self.stream.start()
             logger.info("Audio Engine started at %d Hz.", AUDIO_SAMPLE_RATE)
@@ -124,18 +159,27 @@ class AudioEngine:
             logger.info("Audio Engine started (stream inactive).")
 
     def stop(self) -> None:
+        """Stops the audio output stream and clears playing voices."""
         self.clear_voices()
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
 
     def clear_voices(self) -> None:
-        """Immediately silences all playing thunder voices."""
+        """Immediately silences all active thunder voices."""
         with self.lock:
             self.active_voices.clear()
 
     def schedule_thunder(self, strike: StrikeEvent) -> None:
-        """Processes DSP (LPF + Gain + Constant-Power Pan) and queues playback."""
+        """Processes DSP (Butterworth LPF + Gain + Constant-Power Stereo Pan) and queues playback.
+
+        Selects an audio sample based on distance tier, applies distance attenuation,
+        filters high frequencies via cached 2nd-order Butterworth SOS, pans across stereo
+        channels using constant-power trigonometry (cos/sin), and enqueues for mixing.
+
+        Args:
+            strike: StrikeEvent containing distance, epicenter, gain, and LPF cutoff.
+        """
         if self.state.is_zero_intensity:
             return
 
@@ -157,6 +201,7 @@ class AudioEngine:
             * strike.audio_gain_linear
         )
 
+        # Constant-power panning law: L = cos(theta), R = sin(theta) where theta in [0, pi/2]
         theta = strike.stereo_pan * (math.pi / 2.0)
         stereo_buf = np.column_stack(
             (scaled * math.cos(theta), scaled * math.sin(theta))
@@ -168,6 +213,17 @@ class AudioEngine:
     def _audio_callback(
         self, outdata: np.ndarray, frames: int, time_info, status
     ) -> None:
+        """Real-time sounddevice audio callback filling output buffer frames.
+
+        Zero-allocation hot path: mixes continuous looping rain bed and all active
+        thunder voices, applies master volume, and clips to safety thresholds.
+
+        Args:
+            outdata: 2D numpy array (frames, 2) to be populated with float32 samples.
+            frames: Number of sample frames requested by DAC.
+            time_info: PortAudio timestamp structure.
+            status: PortAudio callback status flags (e.g. underflow/overflow).
+        """
         outdata.fill(0.0)
 
         if self.state.is_zero_intensity:

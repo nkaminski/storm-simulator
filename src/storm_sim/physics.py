@@ -1,4 +1,9 @@
-"""physics.py - Mathematical modeling for optics, acoustics, and meteorology."""
+"""physics.py - Mathematical modeling for optics, acoustics, and meteorology.
+
+Provides the pure mathematical physics engine governing distance sampling, Beer-Lambert
+optical extinction, spatial Gaussian illumination dispersion, multi-stroke envelope
+timing, acoustic speed-of-sound propagation delays, and atmospheric low-pass filtering.
+"""
 
 from __future__ import annotations
 import math
@@ -43,7 +48,27 @@ class PhysicsEngine:
         forced_dist: Optional[float] = None,
         forced_epicenter: Optional[float] = None,
     ) -> StrikeEvent:
-        # 1. Distance sampling via Intensity-skewed Beta Distribution
+        """Generates a complete deterministic physical plan for a lightning strike.
+
+        Combines optical propagation, luminous envelope generation, and acoustic
+        speed-of-sound delay calculation into a unified StrikeEvent.
+
+        Args:
+            state: The active StormState containing meteorology settings and bounds.
+            now: Current monotonic timestamp in seconds.
+            forced_dist: Optional forced distance in miles (used for manual triggers).
+            forced_epicenter: Optional forced horizontal epicenter [0.0 - 1.0].
+
+        Returns:
+            A StrikeEvent containing the optical envelope, spatial sigma, audio delay,
+            LPF cutoff, gain scalar, and stereo pan position.
+        """
+        # ----------------------------------------------------------------------
+        # 1. Distance sampling via Intensity-Skewed Beta Distribution
+        # ----------------------------------------------------------------------
+        # When intensity s -> 1.0, beta increases and alpha decreases, skewing
+        # random draws toward the minimum distance (frequent close overhead bolts).
+        # When intensity s -> 0.0, alpha increases, pushing strikes to the horizon.
         if forced_dist is not None:
             d = max(ABSOLUTE_MIN_DIST_MILES, forced_dist)
         else:
@@ -55,7 +80,10 @@ class PhysicsEngine:
                 state.max_dist_miles - state.min_dist_miles
             )
 
+        # ----------------------------------------------------------------------
         # 2. Horizontal Epicenter
+        # ----------------------------------------------------------------------
+        # Coordinates along the LED strip: 0.0 = Leftmost pixel, 1.0 = Rightmost
         epicenter = (
             forced_epicenter
             if forced_epicenter is not None
@@ -63,7 +91,11 @@ class PhysicsEngine:
         )
         epicenter = max(0.0, min(1.0, epicenter))
 
+        # ----------------------------------------------------------------------
         # 3. Optical Attenuation: Inverse-Square + Beer-Lambert Extinction
+        # ----------------------------------------------------------------------
+        # Combines geometric 1/(d^2 + d_min^2) falloff with exponential atmospheric
+        # extinction: exp(-extinction * d), scaled by current rainfall density.
         rain_extinction = (
             BASE_OPTICAL_EXTINCTION
             + RAIN_OPTICAL_EXTINCTION_SCALE * state.effective_rain_level
@@ -76,10 +108,18 @@ class PhysicsEngine:
         )
         peak_brightness = max(MIN_PEAK_BRIGHTNESS, min(1.0, raw_intensity))
 
-        # 4. Spatial Width (Sigma): Close strikes are tight; distant strikes wash wide
+        # ----------------------------------------------------------------------
+        # 4. Spatial Width (Sigma): Gaussian flash dispersion across LED strip
+        # ----------------------------------------------------------------------
+        # Close strikes illuminate a focused, localized region of pixels; distant
+        # strikes scatter through clouds and sheet across the entire horizon.
         spatial_sigma = BASE_SPATIAL_SIGMA + SPATIAL_SIGMA_PER_MILE * d
 
+        # ----------------------------------------------------------------------
         # 5. Multi-Stroke Return Envelope Generation
+        # ----------------------------------------------------------------------
+        # Multi-stroke lightning flashes: an initial leader/stroke pulse followed
+        # by 0 to N secondary pulses along the ionized channel.
         max_extra_strokes = int(round(MAX_EXTRA_STROKES_AT_PEAK * state.intensity))
         num_strokes = 1 + random.randint(0, max_extra_strokes)
         strokes: List[StrokePulse] = []
@@ -98,7 +138,12 @@ class PhysicsEngine:
             )
             t_cursor += dur + random.uniform(*INTER_STROKE_GAP_RANGE_SEC)
 
+        # ----------------------------------------------------------------------
         # 6. Acoustic Propagation Delay, Attenuation, and Atmospheric LPF
+        # ----------------------------------------------------------------------
+        # Delay: Speed of sound (~4.69 sec/mile).
+        # Gain: 20*log10(d_ref / d) spherical spreading loss + 2.8 dB/mile air absorption.
+        # LPF: High frequencies (>6 kHz) are absorbed over distance, leaving sub-bass rumbles.
         audio_delay = d / SPEED_OF_SOUND_MILES_PER_SEC
         gain_db = -20.0 * math.log10(
             max(d, ACOUSTIC_REF_DIST_MILES) / ACOUSTIC_REF_DIST_MILES

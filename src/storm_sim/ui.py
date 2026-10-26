@@ -1,4 +1,9 @@
-"""ui.py - Desktop visualizer and interactive hardware control bench."""
+"""ui.py - Desktop visualizer and interactive hardware control bench.
+
+Provides a Tkinter-based desktop interface with real-time LED array visualization,
+speed-of-sound pending thunder queue tracking, click-to-strike interaction,
+and live slider controls for all simulation parameters.
+"""
 
 from __future__ import annotations
 import asyncio
@@ -29,9 +34,29 @@ from .models import StormState, StrikeEvent
 
 
 class StormDesktopUI:
-    """Native desktop hardware visualizer and control panel."""
+    """Native desktop hardware visualizer and control panel.
+
+    Displays an animated canvas reflecting real-time DMX pixel values across the strip,
+    live telemetry readouts, slider controls for storm intensity, lighting gain, and audio
+    volume, and a queue of acoustic wavefronts in transit at the speed of sound.
+
+    Attributes:
+        coordinator: Shared StormCoordinator instance.
+        state: Shared StormState configuration.
+        lighting: Shared E131LightingEngine instance.
+        root: Root Tk window.
+        canvas: Tkinter Canvas displaying LED strip brightness.
+    """
 
     def __init__(self, coordinator: StormCoordinator):
+        """Initializes desktop UI window, styles, layout, and strike tracker hook.
+
+        Args:
+            coordinator: Running StormCoordinator instance.
+
+        Raises:
+            RuntimeError: If tkinter is not available in the current Python environment.
+        """
         try:
             import tkinter as tk
             from tkinter import ttk
@@ -59,10 +84,8 @@ class StormDesktopUI:
         self._configure_styles()
         self._build_layout()
 
-    def _patch_strike_tracker() -> None:
-        pass  # Defined as instance method below
-
     def _patch_strike_tracker(self) -> None:
+        """Hooks the lighting engine flash trigger to track active strikes in the UI telemetry."""
         orig_trigger = self.lighting.trigger_flash
 
         def hooked_trigger(strike: StrikeEvent) -> None:
@@ -72,6 +95,7 @@ class StormDesktopUI:
         self.lighting.trigger_flash = hooked_trigger
 
     def _configure_styles(self) -> None:
+        """Configures ttk widget styles and color scheme for dark test bench theme."""
         style = self.ttk.Style(self.root)
         try:
             style.theme_use("clam")
@@ -100,6 +124,7 @@ class StormDesktopUI:
         style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6)
 
     def _build_layout(self) -> None:
+        """Constructs visualizer canvas, parameter sliders, triggers, and telemetry."""
         # 1. Top LED Array Visualizer Section
         top_frame = self.ttk.Frame(self.root, padding=(16, 12, 16, 6))
         top_frame.pack(fill=self.tk.X)
@@ -287,6 +312,7 @@ class StormDesktopUI:
         max_v: float,
         callback,
     ) -> None:
+        """Helper building a labeled horizontal slider with live numerical readout."""
         row = self.ttk.Frame(parent, style="Panel.TFrame")
         row.pack(fill=self.tk.X, pady=4)
         top = self.ttk.Frame(row, style="Panel.TFrame")
@@ -311,6 +337,7 @@ class StormDesktopUI:
         scale.pack(fill=self.tk.X, pady=(2, 0))
 
     def _on_canvas_click(self, event) -> None:
+        """Triggered when the user clicks the simulated LED canvas: fires strike at mouse X position."""
         width = max(1, self.canvas.winfo_width())
         epicenter = max(0.0, min(1.0, event.x / width))
         if self.state.is_zero_intensity:
@@ -321,18 +348,22 @@ class StormDesktopUI:
         )
 
     def _on_intensity_change(self, val: float) -> None:
+        """Callback for master intensity slider changes."""
         self.state.ramp_duration = 0.0
         self.state.intensity = val
         if self.state.is_zero_intensity:
             self.coordinator.halt_all_activity()
 
     def _on_min_dist_change(self, val: float) -> None:
+        """Callback for minimum strike distance slider changes."""
         self.state.min_dist_miles = min(val, self.state.max_dist_miles - 0.05)
 
     def _on_max_dist_change(self, val: float) -> None:
+        """Callback for maximum strike distance slider changes."""
         self.state.max_dist_miles = max(val, self.state.min_dist_miles + 0.05)
 
     def _on_toggle_overrides(self) -> None:
+        """Toggles decoupled manual micro-overrides for strike rate and rain volume."""
         if self.var_override_enable.get():
             self.state.override_rate = self.var_rate_override.get()
             self.state.override_rain = self.var_rain_override.get()
@@ -341,19 +372,23 @@ class StormDesktopUI:
             self.state.override_rain = None
 
     def _on_rate_override_change(self, val: float) -> None:
+        """Callback for manual strike rate override slider."""
         if self.var_override_enable.get():
             self.state.override_rate = val
 
     def _on_rain_override_change(self, val: float) -> None:
+        """Callback for manual rain volume override slider."""
         if self.var_override_enable.get():
             self.state.override_rain = val
 
     def _kill_storm(self) -> None:
+        """Emergency killswitch: sets intensity to 0 and clears all lighting and audio."""
         self.var_intensity.set(0.0)
         self.state.intensity = 0.0
         self.coordinator.halt_all_activity()
 
     def _update_ui_tick(self) -> None:
+        """Periodic UI refresh timer updating canvas pixels and telemetry queue."""
         if not self.state.running:
             return
 
@@ -414,11 +449,13 @@ class StormDesktopUI:
         self.root.after(int(1000 / DEFAULT_FPS), self._update_ui_tick)
 
     def _on_close(self) -> None:
+        """Window close handler: cleanly stops simulation and destroys window."""
         self.state.running = False
         self.coordinator.halt_all_activity()
         self.root.destroy()
 
     def run(self) -> None:
+        """Starts the Tkinter UI event loop."""
         self.root.after(50, self._update_ui_tick)
         self.root.mainloop()
 
@@ -427,7 +464,12 @@ def run_ui_app(
     coordinator: Optional[StormCoordinator] = None,
     state: Optional[StormState] = None,
 ) -> None:
-    """Entry point for GUI script storm-sim-ui."""
+    """GUI script entry point for storm-sim-ui.
+
+    Args:
+        coordinator: Optional existing StormCoordinator instance.
+        state: Optional existing StormState instance if coordinator is not provided.
+    """
     if coordinator is None:
         if state is None:
             state = StormState()

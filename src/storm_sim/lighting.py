@@ -1,4 +1,8 @@
-"""lighting.py - E1.31 (sACN) monochrome white lighting engine."""
+"""lighting.py - E1.31 (sACN) monochrome white lighting engine.
+
+Renders spatial 1D Gaussian flashes across multiple E1.31 universes (512 monochrome
+pixels per universe) with microsecond temporal stroke decay and zero-copy byte streaming.
+"""
 
 from __future__ import annotations
 import logging
@@ -21,9 +25,27 @@ logger = logging.getLogger("storm_sim.lighting")
 
 
 class E131LightingEngine:
-    """Renders 1D monochrome white lightning envelopes to E1.31 DMX universes."""
+    """Renders 1D monochrome white lightning envelopes to E1.31 DMX universes.
+
+    Manages active lightning flashes, renders temporal envelopes sampled across
+    a 1D Gaussian spatial distribution, and outputs sACN packets over UDP multicast
+    or unicast across multiple DMX universes.
+
+    Attributes:
+        state: Reference to the shared StormState instance.
+        active_strikes: Currently playing StrikeEvents undergoing envelope decay.
+        sender: sacn.sACNsender instance managing network sockets and threads.
+        universes: List of active universe integers assigned to cover all pixels.
+        pixel_coords: Normalized coordinates [0.0 to 1.0] across all pixels.
+        last_frame_dmx: 1D uint8 array holding the most recently rendered DMX bytes.
+    """
 
     def __init__(self, state: StormState):
+        """Initializes the lighting engine and preallocates frame buffers.
+
+        Args:
+            state: The shared StormState configuration.
+        """
         self.state = state
         self.active_strikes: List[StrikeEvent] = []
         self.sender = sacn.sACNsender(fps=state.fps, bind_port=0)
@@ -33,6 +55,7 @@ class E131LightingEngine:
         self._frame_white: np.ndarray = np.zeros(state.pixels, dtype=np.float32)
 
     def start(self) -> None:
+        """Starts the underlying sACN transmitter background thread and universe outputs."""
         self.sender.start()
         self._configure_universes(self.state.pixels)
         logger.info(
@@ -44,6 +67,14 @@ class E131LightingEngine:
         )
 
     def _configure_universes(self, pixel_count: int) -> None:
+        """Dynamically configures or reallocates sACN universes to match pixel count.
+
+        Since each monochrome white pixel uses exactly 1 DMX channel, 512 pixels can
+        be addressed per universe. Multi-universe spans are allocated sequentially.
+
+        Args:
+            pixel_count: Total number of 1-channel pixels to allocate.
+        """
         for u in self.universes:
             self.sender.deactivate_output(u)
         self.universes.clear()
@@ -64,6 +95,14 @@ class E131LightingEngine:
         self._frame_white = np.zeros(pixel_count, dtype=np.float32)
 
     def trigger_flash(self, strike: StrikeEvent) -> None:
+        """Enqueues a new lightning strike for real-time optical rendering.
+
+        Precomputes the spatial Gaussian profile ahead of time to eliminate
+        redundant `np.exp` calls from the 44 FPS hot rendering loop.
+
+        Args:
+            strike: StrikeEvent containing spatial parameters and stroke timing.
+        """
         if not self.state.is_zero_intensity:
             # Precompute spatial profile ahead of time so render loop never calls np.exp
             if strike.spatial_profile is None or len(strike.spatial_profile) != len(self.pixel_coords):
@@ -82,6 +121,15 @@ class E131LightingEngine:
             self.sender[univ].dmx_data = ()
 
     def render_frame(self, now: float) -> None:
+        """Renders one animation frame of DMX brightness values and sends via sACN.
+
+        Iterates over all active strikes, calculates exponential decay for each
+        stroke pulse, sums spatial contributions into a preallocated float32 buffer,
+        clips to [0, 255], and transmits raw bytes to sACN universes.
+
+        Args:
+            now: Current monotonic timestamp in seconds.
+        """
         if len(self.pixel_coords) != self.state.pixels:
             self._configure_universes(self.state.pixels)
 
@@ -137,6 +185,7 @@ class E131LightingEngine:
             self.sender[univ].dmx_data = dmx_bytes[start_px:end_px].tobytes()
 
     def stop(self) -> None:
+        """Cleanly stops the sACN sender thread and clears outputs."""
         self.clear_all()
         time.sleep(0.05)
         self.sender.stop()

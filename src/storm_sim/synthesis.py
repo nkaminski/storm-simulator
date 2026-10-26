@@ -41,13 +41,37 @@ logger = logging.getLogger("storm_sim.synthesis")
 
 
 class ThunderSynthesizer:
-    """Dedicated procedural acoustic synthesizer for lightning thunder and rain."""
+    """Dedicated procedural acoustic synthesizer for lightning thunder and rain.
+
+    Produces synthetic acoustic waveforms using multi-burst filtered Gaussian noise
+    and exponential envelopes. Capable of generating in-memory numpy audio arrays or
+    exporting pre-rendered 24/48kHz WAV files to disk for zero-overhead runtime loading.
+
+    Attributes:
+        sample_rate: Target sample rate in Hz (default: 44100).
+    """
 
     def __init__(self, sample_rate: int = AUDIO_SAMPLE_RATE):
+        """Initializes the procedural synthesizer.
+
+        Args:
+            sample_rate: Target audio sample rate in Hz.
+        """
         self.sample_rate = sample_rate
 
     def synthesize_thunder(self, tier: str) -> np.ndarray:
-        """Synthesizes a realistic multi-burst thunderclap for a given distance tier ('close', 'mid', 'far')."""
+        """Synthesizes a realistic multi-burst thunderclap for a given distance tier.
+
+        Generates Gaussian white noise, modulates with an overall exponential decay
+        envelope plus several randomized secondary bursts, applies a tier-specific
+        Butterworth low-pass filter, and normalizes to a standard peak amplitude.
+
+        Args:
+            tier: Distance tier string: 'close' (<1.2 mi), 'mid' (1.2-3.2 mi), or 'far' (>3.2 mi).
+
+        Returns:
+            1D float32 numpy array containing the synthesized mono thunderclap.
+        """
         dur = SYNTH_THUNDER_DURATIONS_SEC[tier]
         n = int(self.sample_rate * dur)
         t = np.linspace(0.0, dur, n, dtype=np.float32)
@@ -81,7 +105,18 @@ class ThunderSynthesizer:
     def synthesize_rain_loop(
         self, duration_sec: float = SYNTH_RAIN_LOOP_DURATION_SEC
     ) -> np.ndarray:
-        """Generates a seamlessly looping stereo rain bed using crossfaded filtered noise."""
+        """Generates a seamlessly looping stereo rain bed using crossfaded filtered noise.
+
+        Generates 2-channel Gaussian white noise, filters with a Butterworth bandpass
+        (400 Hz - 6500 Hz), and applies a linear crossfade window between the head and
+        tail to produce a seamless loop without audible splices.
+
+        Args:
+            duration_sec: Total duration in seconds of the generated rain bed.
+
+        Returns:
+            2D float32 numpy array (N, 2) containing seamless stereo ambient rain.
+        """
         n = int(self.sample_rate * duration_sec)
         white = np.random.normal(0.0, SYNTH_RAIN_NOISE_AMPLITUDE, (n, 2)).astype(np.float32)
         sos = signal.butter(
@@ -101,7 +136,14 @@ class ThunderSynthesizer:
     def build_soundbank(
         self, variations_per_tier: int = PROCEDURAL_VARIATIONS_PER_TIER
     ) -> Tuple[Dict[str, List[np.ndarray]], np.ndarray]:
-        """Generates a complete in-memory soundbank for immediate engine consumption."""
+        """Generates a complete in-memory soundbank for immediate engine consumption.
+
+        Args:
+            variations_per_tier: Number of unique thunder variations per distance tier.
+
+        Returns:
+            Tuple of (thunder_bank_dict, rain_loop_stereo_array).
+        """
         bank: Dict[str, List[np.ndarray]] = {"close": [], "mid": [], "far": []}
         for tier in ("close", "mid", "far"):
             for _ in range(variations_per_tier):
@@ -114,7 +156,12 @@ class ThunderSynthesizer:
         output_dir: Path,
         variations_per_tier: int = PROCEDURAL_VARIATIONS_PER_TIER,
     ) -> None:
-        """Pre-renders and exports all WAV assets to disk ahead-of-time."""
+        """Pre-renders and exports all WAV assets to disk ahead-of-time.
+
+        Args:
+            output_dir: Target root directory for audio tiers and rain WAV.
+            variations_per_tier: Number of unique WAV files to generate per tier.
+        """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         print(f"[*] Pre-rendering procedural soundbank into: {output_dir.resolve()}")
@@ -136,6 +183,14 @@ class ThunderSynthesizer:
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parses command-line arguments for the storm-synth generator CLI.
+
+    Args:
+        args: Optional list of argument strings (defaults to sys.argv[1:]).
+
+    Returns:
+        argparse.Namespace containing parsed CLI options.
+    """
     parser = argparse.ArgumentParser(
         prog="storm-synth",
         description="AOT Procedural Thunder and Rain Soundbank Generator",
@@ -165,6 +220,7 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(args: Optional[List[str]] = None) -> None:
+    """CLI entry point for pre-rendering soundbank WAV files to disk."""
     parsed = parse_args(args)
     synth = ThunderSynthesizer(sample_rate=parsed.sample_rate)
     synth.export_soundbank(

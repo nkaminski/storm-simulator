@@ -1,4 +1,8 @@
-"""cli.py - Command-line interface and entry point for storm-sim."""
+"""cli.py - Command-line interface and entry point for storm-sim.
+
+Provides argparse CLI options for headless simulator operation, E1.31 sACN network configuration,
+meteorological parameter controls, and GUI test bench launching.
+"""
 
 from __future__ import annotations
 import argparse
@@ -27,6 +31,14 @@ from .models import StormState
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parses command-line arguments for storm-sim.
+
+    Args:
+        args: Optional list of argument strings (defaults to sys.argv[1:]).
+
+    Returns:
+        argparse.Namespace containing parsed CLI options.
+    """
     parser = argparse.ArgumentParser(
         prog="storm-sim",
         description="Physics-Based E1.31 (Monochrome White) & Spatial Audio Thunderstorm Simulator",
@@ -125,6 +137,11 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(args: Optional[List[str]] = None) -> None:
+    """Main CLI entry point initializing StormState and running the coordinator.
+
+    Args:
+        args: Optional list of argument strings.
+    """
     parsed = parse_args(args)
 
     use_multicast = parsed.multicast or (parsed.e131_host is None)
