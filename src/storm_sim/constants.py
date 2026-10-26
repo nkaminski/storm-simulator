@@ -116,11 +116,12 @@ RAIN_OPTICAL_EXTINCTION_SCALE: float = 0.05
 #: Distance offset parameter (miles) softening singularity for immediate overhead strikes
 OPTICAL_SOFTENING_DIST_MILES: float = 0.45
 
-#: Normalization offset preventing total extinction at close range
-OPTICAL_NORM_OFFSET: float = 1.40
+#: Normalization offset calibrated so close strikes (<=0.5 mi) reach full 3kW tungsten saturation (DMX 255)
+#: while mid-distance strikes (1-2 mi) scale down through 2kW to 1kW equivalents
+OPTICAL_NORM_OFFSET: float = 0.65
 
-#: Minimum visible peak brightness floor to preserve distant horizon sheet lightning
-MIN_PEAK_BRIGHTNESS: float = 0.18
+#: Minimum visible peak brightness floor (8% ~ 240W tungsten equiv / DMX 20) above AC LED drop-out threshold
+MIN_PEAK_BRIGHTNESS: float = 0.08
 
 #: Minimum Gaussian flash width (sigma, normalized to strip length [0.0 - 1.0])
 BASE_SPATIAL_SIGMA: float = 0.035

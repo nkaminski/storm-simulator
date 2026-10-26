@@ -148,6 +148,13 @@ storm-sim --passthrough 0.0.0.0:5568 --passthrough-universe 2 --universe 1
 
 The optical engine is tuned to err toward the dramatic aesthetic of being on the open waters of **Lake Michigan** during a Midwest squall, where water reflections and cloud-deck diffusion illuminate the entire horizon.
 
+### Photometric Calibration Benchmark (3 kW Tungsten Reference)
+The lighting subsystem uses a **3 kW tungsten-halogen baseline (~78,000 lumens)** as its photometric full-scale calibration benchmark:
+- **Full Output ($DMX = 255$, 100%):** Equivalent to 3,000 Watts of incandescent/halogen stage illumination (~78,000 lm), representing an unattenuated direct strike ($d \le 0.5\text{ mi}$) saturating the visual field.
+- **Mid-Distance Flashes ($DMX = 100–170$):** Equivalent to 1,200 W – 2,000 W of tungsten output (~30,000 – 50,000 lm) casting soft, broad cloud illumination.
+- **Distant Sheet Horizon Floor ($DMX = 50–70$):** Equivalent to 600 W – 800 W of tungsten output (~15,000 – 21,000 lm) preserving visible sheet lightning across water.
+- **AC LED 60 Hz Dynamics:** Fixture on-time is locked to 4 AC cycles ($1/15\text{ s} \approx 66.7\text{ ms}$) to overcome bridge rectifier charging and forward diode voltage ($V_f$), with 3–6 AC cycle gaps ($50–100\text{ ms}$) for TRIAC zero-crossing commutation.
+
 ### 1. Typical / Moderate Illinois Thunderstorm (Default Experience)
 *Realistic prairie summer storm cell passing overhead with rolling thunder and dramatic water/cloud reflections.*
 - **Aesthetic:** Dramatic balance of crisp overhead bolts (saturating localized pixels to full DMX 255), prominent mid-range strikes at 2–3 miles (peaking at ~120–150 DMX), and broad diffuse sheet flashes illuminating the cloud base across all channels.

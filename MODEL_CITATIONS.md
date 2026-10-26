@@ -46,9 +46,9 @@ $$I(d) = \min\left(1.0, \frac{(d_{\text{min}}^p + \text{offset}) \cdot e^{-\alph
 where:
 - $p = 1.10$ is the diffuse scattering line-source exponent (`OPTICAL_DISTANCE_EXPONENT`),
 - $d_{\text{min}} = 0.45\text{ mi}$ is the overhead softening distance (`OPTICAL_SOFTENING_DIST_MILES`),
-- $\text{offset} = 1.40$ is the close-range normalization offset (`OPTICAL_NORM_OFFSET`),
+- $\text{offset} = 0.65$ is the close-range normalization offset (`OPTICAL_NORM_OFFSET`) calibrated so overhead strikes ($\le 0.5\text{ mi}$) reach full 3kW tungsten saturation (DMX 255) while mid-distance strikes (1–2 mi) scale through 2kW to 1kW equivalents,
 - $\alpha_{\text{ext}} = \alpha_0 + \alpha_{\text{rain}} \cdot R$ is the hydrometeor-dependent extinction coefficient (`BASE_OPTICAL_EXTINCTION`, `RAIN_OPTICAL_EXTINCTION_SCALE`),
-- Clamped to a visibility floor $I_{\text{min}} = 0.18$ (`MIN_PEAK_BRIGHTNESS`) to preserve distant horizon sheet lightning.
+- Clamped to a visibility floor $I_{\text{min}} = 0.08$ (`MIN_PEAK_BRIGHTNESS`; ~240W tungsten equivalent) sitting comfortably above AC LED phase-dimmer low-end drop-out thresholds.
 
 ### Temporal Optical Envelope & AC LED Electrical Dynamics
 While return stroke channel breakdown occurs in microseconds, channel continuing currents (30–50% of cloud-to-ground discharges; Uman 1987) and multiple cloud scattering (Thomason & Krider 1982) stretch visible illumination across 50–250 ms.
