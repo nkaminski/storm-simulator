@@ -127,6 +127,9 @@ class ThunderSynthesizer:
             output="sos",
         )
         rain = signal.sosfilt(sos, white, axis=0).astype(np.float32)
+        peak = np.max(np.abs(rain))
+        if peak > 0:
+            rain = rain / peak
         fade_len = int(self.sample_rate * SYNTH_RAIN_CROSSFADE_SEC)
         fade_in = np.linspace(0.0, 1.0, fade_len, dtype=np.float32)[:, np.newaxis]
         fade_out = np.linspace(1.0, 0.0, fade_len, dtype=np.float32)[:, np.newaxis]

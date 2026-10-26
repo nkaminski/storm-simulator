@@ -25,6 +25,7 @@ from .constants import (
     AUDIO_SAMPLE_RATE,
     BUTTERWORTH_FILTER_ORDER,
     PROCEDURAL_VARIATIONS_PER_TIER,
+    RAIN_BED_BASE_GAIN,
     SAMPLE_PEAK_NORMALIZE_TARGET,
     SYNTH_RAIN_LOOP_DURATION_SEC,
     TIER_CLOSE_MAX_MILES,
@@ -130,10 +131,24 @@ class AudioEngine:
 
             rain_files = list(self.assets_dir.glob("*rain*.wav"))
             if rain_files:
-                data, _ = sf.read(rain_files[0], dtype="float32", always_2d=True)
+                data, sr = sf.read(rain_files[0], dtype="float32", always_2d=True)
                 if data.shape[1] == 1:
                     data = np.repeat(data, 2, axis=1)
-                self.rain_loop = data[:, :2].astype(np.float32)
+                if sr != AUDIO_SAMPLE_RATE:
+                    num_samples = int(len(data) * AUDIO_SAMPLE_RATE / sr)
+                    data = signal.resample(data, num_samples, axis=0)
+                peak = np.max(np.abs(data))
+                if peak > 0:
+                    data = data / peak
+                # Warm 2nd-order Butterworth lowpass filter to tame harsh 4kHz+ high-frequency noise
+                sos = signal.butter(
+                    BUTTERWORTH_FILTER_ORDER,
+                    3500.0,
+                    btype="low",
+                    fs=AUDIO_SAMPLE_RATE,
+                    output="sos",
+                )
+                self.rain_loop = signal.sosfilt(sos, data[:, :2], axis=0).astype(np.float32)
 
         # Procedural fallback synthesis via dedicated ThunderSynthesizer
         synth = ThunderSynthesizer(sample_rate=AUDIO_SAMPLE_RATE)
@@ -232,19 +247,23 @@ class AudioEngine:
                     self.active_voices.clear()
             return
 
-        # 1. Continuous Background Rain Bed (zero allocation slice addition)
-        rain_lvl = self.state.effective_rain_level * self.state.master_volume
-        if rain_lvl > 0.001:
+        # 1. Continuous Background Rain Bed (scaled by RAIN_BED_BASE_GAIN)
+        rain_gain = (
+            self.state.effective_rain_level
+            * self.state.master_volume
+            * RAIN_BED_BASE_GAIN
+        )
+        if rain_gain > 0.0001:
             loop_len = len(self.rain_loop)
             idx = self.rain_cursor
             if idx + frames <= loop_len:
-                outdata[:] += self.rain_loop[idx : idx + frames] * rain_lvl
+                outdata[:] += self.rain_loop[idx : idx + frames] * rain_gain
                 self.rain_cursor = (idx + frames) % loop_len
             else:
                 part1 = loop_len - idx
                 part2 = frames - part1
-                outdata[:part1] += self.rain_loop[idx:] * rain_lvl
-                outdata[part1:] += self.rain_loop[:part2] * rain_lvl
+                outdata[:part1] += self.rain_loop[idx:] * rain_gain
+                outdata[part1:] += self.rain_loop[:part2] * rain_gain
                 self.rain_cursor = part2
 
         # 2. Active Polyphonic Thunder Voices

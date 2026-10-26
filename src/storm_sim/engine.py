@@ -194,3 +194,10 @@ class StormCoordinator:
             self.lighting.stop()
             self.audio.stop()
             logger.info("Storm Engine shut down cleanly.")
+
+    def stop(self) -> None:
+        """Cleanly stops the coordinator, halts activity, and shuts down lighting and audio subsystems."""
+        self.state.running = False
+        self.halt_all_activity()
+        self.lighting.stop()
+        self.audio.stop()

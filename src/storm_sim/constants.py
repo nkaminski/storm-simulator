@@ -193,6 +193,9 @@ TIER_MID_MAX_MILES: float = 3.2
 #: Target peak normalized amplitude for audio sample banks
 SAMPLE_PEAK_NORMALIZE_TARGET: float = 0.90
 
+#: Base volume gain scalar for continuous background rain bed relative to thunder
+RAIN_BED_BASE_GAIN: float = 0.06
+
 #: Safety ceiling clipping limit preventing DAC distortion or digital wrap-around
 AUDIO_OUTPUT_CLIP_LIMIT: float = 0.98
 
@@ -225,10 +228,10 @@ SYNTH_RAIN_LOOP_DURATION_SEC: float = 12.0
 SYNTH_RAIN_CROSSFADE_SEC: float = 1.5
 
 #: Bandpass filter frequency range (Hz) shaping white noise into realistic rain
-SYNTH_RAIN_BANDPASS_HZ: Tuple[float, float] = (400.0, 6500.0)
+SYNTH_RAIN_BANDPASS_HZ: Tuple[float, float] = (280.0, 4800.0)
 
 #: Standard deviation of Gaussian white noise for procedural rain generation
-SYNTH_RAIN_NOISE_AMPLITUDE: float = 0.15
+SYNTH_RAIN_NOISE_AMPLITUDE: float = 0.08
 
 #: Range [min, max] of secondary acoustic bursts in procedural thunderclaps
 SYNTH_THUNDER_BURSTS_RANGE: Tuple[int, int] = (3, 7)

@@ -38,6 +38,34 @@ def test_audio_callback_rain_and_killswitch():
         audio.stop()
 
 
+def test_audio_rain_level_scaling_and_headroom():
+    state = StormState(intensity=0.5)
+    audio = AudioEngine(state)
+    try:
+        out_mid = np.zeros((2048, 2), dtype=np.float32)
+        state.override_rain = 0.5
+        audio._audio_callback(out_mid, 2048, None, None)
+        peak_mid = np.max(np.abs(out_mid))
+
+        out_high = np.zeros((2048, 2), dtype=np.float32)
+        state.override_rain = 1.0
+        audio._audio_callback(out_high, 2048, None, None)
+        peak_high = np.max(np.abs(out_high))
+
+        out_zero = np.zeros((2048, 2), dtype=np.float32)
+        state.override_rain = 0.0
+        audio._audio_callback(out_zero, 2048, None, None)
+
+        # Rain volume scales monotonically with override_rain
+        assert peak_high > peak_mid > 0.0
+        assert np.all(out_zero == 0.0)
+
+        # Rain bed must remain comfortable ambient level (< 0.10 peak) leaving headroom for thunder (0.90)
+        assert peak_high < 0.10
+    finally:
+        audio.stop()
+
+
 def test_audio_schedule_thunder_voice():
     state = StormState(intensity=0.7)
     audio = AudioEngine(state)

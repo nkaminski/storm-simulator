@@ -216,34 +216,53 @@ class StormDesktopUI:
         sep = self.ttk.Separator(ctrl_panel, orient="horizontal")
         sep.pack(fill=self.tk.X, pady=10)
 
-        self.var_override_enable = self.tk.BooleanVar(value=False)
+        has_manual = self.state.override_rain is not None or self.state.override_rate is not None
+        self.var_override_enable = self.tk.BooleanVar(value=has_manual)
         chk = self.ttk.Checkbutton(
             ctrl_panel,
-            text="Enable Manual Micro Overrides (Decouple Rate & Rain from Intensity)",
+            text="Enable Manual Overrides (Decouple Rate & Rain from Intensity)",
             variable=self.var_override_enable,
             command=self._on_toggle_overrides,
         )
         chk.pack(anchor=self.tk.W, pady=(0, 6))
 
-        self.var_rate_override = self.tk.DoubleVar(value=12.0)
-        self._add_slider(
+        init_rate = (
+            self.state.override_rate
+            if self.state.override_rate is not None
+            else (self.state.effective_rate_per_sec * 60.0)
+        )
+        self.var_rate_override = self.tk.DoubleVar(value=init_rate)
+        _, self.lbl_rate_val = self._add_slider(
             ctrl_panel,
-            "Manual Strike Rate (strikes / min)",
+            "Strike Rate (strikes / min)",
             self.var_rate_override,
             0.0,
             60.0,
             self._on_rate_override_change,
         )
 
-        self.var_rain_override = self.tk.DoubleVar(value=0.5)
-        self._add_slider(
+        init_rain = (
+            self.state.override_rain
+            if self.state.override_rain is not None
+            else self.state.effective_rain_level
+        )
+        self.var_rain_override = self.tk.DoubleVar(value=init_rain)
+        _, self.lbl_rain_val = self._add_slider(
             ctrl_panel,
-            "Manual Rain Level [0.0 - 1.0]",
+            "Rain Level [0.0 - 1.0]",
             self.var_rain_override,
             0.0,
             1.0,
             self._on_rain_override_change,
         )
+        if self.state.override_rain is not None:
+            self.lbl_rain_val.configure(text=f"{init_rain:.2f} (Manual)")
+        else:
+            self.lbl_rain_val.configure(text=f"{init_rain:.2f} (Auto)")
+        if self.state.override_rate is not None:
+            self.lbl_rate_val.configure(text=f"{init_rate:.1f} (Manual)")
+        else:
+            self.lbl_rate_val.configure(text=f"{init_rate:.1f} (Auto)")
 
         # Right Column: Live Telemetry & Action Triggers
         right_panel = self.ttk.Frame(
@@ -335,6 +354,7 @@ class StormDesktopUI:
             command=on_slide,
         )
         scale.pack(fill=self.tk.X, pady=(2, 0))
+        return scale, val_lbl
 
     def _on_canvas_click(self, event) -> None:
         """Triggered when the user clicks the simulated LED canvas: fires strike at mouse X position."""
@@ -365,21 +385,39 @@ class StormDesktopUI:
     def _on_toggle_overrides(self) -> None:
         """Toggles decoupled manual micro-overrides for strike rate and rain volume."""
         if self.var_override_enable.get():
-            self.state.override_rate = self.var_rate_override.get()
-            self.state.override_rain = self.var_rain_override.get()
+            self.state.override_rate = float(self.var_rate_override.get())
+            self.state.override_rain = float(self.var_rain_override.get())
+            if hasattr(self, "lbl_rain_val"):
+                self.lbl_rain_val.configure(text=f"{self.state.override_rain:.2f} (Manual)")
+            if hasattr(self, "lbl_rate_val"):
+                self.lbl_rate_val.configure(text=f"{self.state.override_rate:.1f} (Manual)")
         else:
             self.state.override_rate = None
             self.state.override_rain = None
+            if hasattr(self, "lbl_rain_val"):
+                eff_rain = self.state.effective_rain_level
+                self.var_rain_override.set(eff_rain)
+                self.lbl_rain_val.configure(text=f"{eff_rain:.2f} (Auto)")
+            if hasattr(self, "lbl_rate_val"):
+                eff_rate = self.state.effective_rate_per_sec * 60.0
+                self.var_rate_override.set(eff_rate)
+                self.lbl_rate_val.configure(text=f"{eff_rate:.1f} (Auto)")
 
     def _on_rate_override_change(self, val: float) -> None:
         """Callback for manual strike rate override slider."""
-        if self.var_override_enable.get():
-            self.state.override_rate = val
+        self.state.override_rate = float(val)
+        if hasattr(self, "var_override_enable"):
+            self.var_override_enable.set(True)
+        if hasattr(self, "lbl_rate_val"):
+            self.lbl_rate_val.configure(text=f"{val:.1f} (Manual)")
 
     def _on_rain_override_change(self, val: float) -> None:
         """Callback for manual rain volume override slider."""
-        if self.var_override_enable.get():
-            self.state.override_rain = val
+        self.state.override_rain = float(val)
+        if hasattr(self, "var_override_enable"):
+            self.var_override_enable.set(True)
+        if hasattr(self, "lbl_rain_val"):
+            self.lbl_rain_val.configure(text=f"{val:.2f} (Manual)")
 
     def _kill_storm(self) -> None:
         """Emergency killswitch: sets intensity to 0 and clears all lighting and audio."""
@@ -394,6 +432,19 @@ class StormDesktopUI:
 
         if abs(self.var_intensity.get() - self.state.intensity) > 0.005:
             self.var_intensity.set(self.state.intensity)
+
+        # In Auto mode (manual overrides disabled), keep sliders in sync with intensity
+        if hasattr(self, "var_override_enable") and not self.var_override_enable.get():
+            eff_rain = self.state.effective_rain_level
+            if abs(self.var_rain_override.get() - eff_rain) > 0.005:
+                self.var_rain_override.set(eff_rain)
+                if hasattr(self, "lbl_rain_val"):
+                    self.lbl_rain_val.configure(text=f"{eff_rain:.2f} (Auto)")
+            eff_rate = self.state.effective_rate_per_sec * 60.0
+            if abs(self.var_rate_override.get() - eff_rate) > 0.1:
+                self.var_rate_override.set(eff_rate)
+                if hasattr(self, "lbl_rate_val"):
+                    self.lbl_rate_val.configure(text=f"{eff_rate:.1f} (Auto)")
 
         self.canvas.delete("all")
         w = max(1, self.canvas.winfo_width())
