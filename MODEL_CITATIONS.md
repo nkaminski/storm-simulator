@@ -105,3 +105,19 @@ To deliver physical accuracy matching the measured power spectrum and outdoor st
 2. **Low-Mid Tortuous Channel Resonance ($55–185\text{ Hz}$):** Multi-burst acoustic packet arrivals modeling sound emitted from tortuous channel kinks at varying altitudes.
 3. **Multi-Band Dry Shockwave Clap ($90–2400\text{ Hz}$):** Calibrated against dry thunderclap acoustics (`dry-thunder3.wav`), featuring a single dominant explosive primary crack ($c_{\text{amp}} = 1.0$) followed by much softer secondary channel kinks ($c_{\text{amp}} \approx 0.20–0.28$) with a 5 ms smooth wavefront rise time that eliminates synthetic digital clicks.
 4. **Specular Building Echoes & Diffuse Urban Canyon Reverberation:** Combines discrete specular reflection taps with finite-facade Gaussian smearing ($12\text{ ms}$), delay-dependent progressive wall absorption, a diffuse reverberation tail ($<110\text{ Hz}$), and real-time stereo lateral reflections ($95–420\text{ ms}$) across opposite channels.
+
+---
+
+## 4. Audio Asset Attributions & Acoustic Ground Truth Sources
+
+The empirical calibration and synthesis of outdoor shockwaves and thunderclaps reference and incorporate the following Creative Commons Attribution 4.0 recordings from Freesound.org:
+
+- **Explosion Outdoors (Medium)** by **EvanBoyerman**  
+  URL: <https://freesound.org/s/753843/>  
+  License: [Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)  
+  *Contribution:* Ground truth outdoor blast wave acoustic profile. Supplies the razor-sharp positive Friedlander shock front, ground slap reflection, and initial displaced air pressure wave attack ($t \approx 0.02 - 0.40\text{ s}$) for close overhead thunder strikes ($<1\text{ mile}$).
+
+- **Dry Thunder3.wav** by **juskiddink**  
+  URL: <https://freesound.org/s/101948/>  
+  License: [Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)  
+  *Contribution:* Ground truth dry lightning channel acoustics. Supplies the empirical multi-band spectral decomposition (low-bark $90–250\text{ Hz}$, mid-crack $250–700\text{ Hz}$, high-tear $700–2400\text{ Hz}$), super-Gaussian tortuous channel kink clustering, and staccato multi-clap peal complexity.

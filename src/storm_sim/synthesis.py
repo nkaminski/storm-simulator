@@ -2,6 +2,10 @@
 
 Dedicated generator class with its own CLI to produce dry thunderclap models
 and seamless stereo rain loops ahead-of-time (AOT) for resource-constrained systems.
+
+Acoustic Ground Truth Attributions (Creative Commons Attribution 4.0):
+- "Explosion Outdoors (Medium)" by EvanBoyerman: https://freesound.org/s/753843/ (CC BY 4.0)
+- "Dry Thunder3.wav" by juskiddink: https://freesound.org/s/101948/ (CC BY 4.0)
 """
 
 from __future__ import annotations

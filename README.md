@@ -226,6 +226,15 @@ For Freesound.org catalog IDs, acoustic requirements, and asset normalization gu
 
 ---
 
+## Audio Asset Attributions & Acknowledgments
+
+The following Creative Commons Attribution 4.0 recordings from Freesound.org provide ground truth acoustic calibration and references:
+
+- **Explosion Outdoors (Medium)** by **EvanBoyerman** -- <https://freesound.org/s/753843/> -- License: Attribution 4.0
+- **Dry Thunder3.wav** by **juskiddink** -- <https://freesound.org/s/101948/> -- License: Attribution 4.0
+
+---
+
 ## Running Tests
 
 To run the test suite:
