@@ -71,11 +71,16 @@ def test_audio_schedule_thunder_voice():
     audio = AudioEngine(state)
     try:
         strike = PhysicsEngine.generate_strike(
-            state, now=0.0, forced_dist=0.5, forced_epicenter=0.25
+            state, now=0.0, forced_dist=0.5, forced_epicenter=0.0
         )
         assert len(audio.active_voices) == 0
         audio.schedule_thunder(strike)
         assert len(audio.active_voices) == 1
+        stereo_buf, _ = audio.active_voices[0]
+        # Hard-left strike (epicenter=0.0): initial 50ms has 0 energy on right channel,
+        # but lateral building reflections (>190ms) bounce energy into the right channel
+        assert np.allclose(stereo_buf[:2000, 1], 0.0)
+        assert np.max(np.abs(stereo_buf[9000:, 1])) > 0.0
         audio.clear_voices()
         assert len(audio.active_voices) == 0
     finally:

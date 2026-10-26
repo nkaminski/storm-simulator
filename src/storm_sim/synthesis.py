@@ -206,10 +206,18 @@ class ThunderSynthesizer:
         else:
             crack_layer = np.zeros(n, dtype=np.float32)
 
-        # Composite multi-layer acoustic mix with master tier low-pass filter
-        composite = (
+        # Composite multi-layer acoustic mix
+        direct_composite = (
             (sub_layer * 0.80) + (mid_layer * 0.35) + (crack_layer * 0.45)
         )
+
+        # ----------------------------------------------------------------------
+        # Layer 4: Environmental Building Echoes & Urban Canyon Reverberation
+        # Models discrete specular reflections off nearby/mid-field building facades
+        # and structures plus diffuse urban canyon / terrain late reverberation.
+        # ----------------------------------------------------------------------
+        reverberant = self._apply_environmental_reflections(direct_composite, tier)
+
         sos_master_lpf = signal.butter(
             3,
             SYNTH_THUNDER_LPF_HZ.get(tier, 280.0),
@@ -217,10 +225,137 @@ class ThunderSynthesizer:
             fs=self.sample_rate,
             output="sos",
         )
-        composite = signal.sosfilt(sos_master_lpf, composite)
+        composite = signal.sosfilt(sos_master_lpf, reverberant)
         peak = float(np.max(np.abs(composite)))
         normalized = (composite / max(peak, 1e-6)) * SAMPLE_PEAK_NORMALIZE_TARGET
         return normalized.astype(np.float32)
+
+    def _apply_environmental_reflections(
+        self, direct: np.ndarray, tier: str
+    ) -> np.ndarray:
+        """Applies discrete specular building reflections and diffuse urban/terrain reverberation.
+
+        Models acoustic wave propagation through a built/natural environment (Kang 2006;
+        Hornikx & Forssén 2009):
+        1. Discrete Specular Building Reflections (65 ms - 2,400 ms):
+           Multi-tap reflections from nearby building facades, street canyons, and distant
+           structures. Each reflection undergoes inverse-distance attenuation, finite-width
+           facade temporal smearing (8-22 ms), and progressive low-pass filtering due to
+           high-frequency scattering and low-frequency diffraction around structures.
+        2. Diffuse Urban Canyon / Terrain Late Reverberation Tail:
+           Exponentially decaying velvet-noise scatterer network low-pass filtered below
+           115 Hz, turning initial claps into rolling, booming architectural/horizon echoes.
+
+        Args:
+            direct: 1D numpy array containing the dry synthesized thunder waveform.
+            tier: Distance tier ('close', 'mid', or 'far').
+
+        Returns:
+            1D float32 numpy array with specular building echoes and diffuse reverberation.
+        """
+        n = len(direct)
+        out = direct.copy().astype(np.float64)
+
+        # 1. Discrete specular building & structure echoes (staggered delay zones)
+        if tier == "close":
+            delay_zones = [
+                (0.065, 0.140),
+                (0.150, 0.280),
+                (0.310, 0.520),
+                (0.560, 0.850),
+                (0.920, 1.350),
+                (1.420, 1.950),
+                (2.050, 2.650),
+            ]
+            base_echo_gain = 0.42
+            reverb_decay = 0.95
+            reverb_mix = 0.28
+        elif tier == "mid":
+            delay_zones = [
+                (0.090, 0.210),
+                (0.240, 0.450),
+                (0.490, 0.820),
+                (0.880, 1.350),
+                (1.450, 2.100),
+                (2.200, 3.100),
+            ]
+            base_echo_gain = 0.46
+            reverb_decay = 1.45
+            reverb_mix = 0.34
+        else:  # far
+            delay_zones = [
+                (0.140, 0.350),
+                (0.420, 0.850),
+                (0.950, 1.600),
+                (1.750, 2.700),
+                (2.850, 4.100),
+            ]
+            base_echo_gain = 0.50
+            reverb_decay = 2.10
+            reverb_mix = 0.40
+
+        for idx, (d_min, d_max) in enumerate(delay_zones):
+            delay_sec = random.uniform(d_min, d_max)
+            delay_samples = int(delay_sec * self.sample_rate)
+            if delay_samples >= n:
+                continue
+
+            # Distance + reflection absorption loss; alternate phase for multipath interference
+            atten = (
+                base_echo_gain
+                * ((1.0 + delay_sec / 0.32) ** -0.78)
+                * random.uniform(0.75, 1.18)
+            )
+            polarity = -1.0 if (idx % 2 == 1) else 1.0
+
+            # Progressive wall/air absorption LPF: later reflections are darker and deeper
+            echo_cutoff_hz = max(58.0, 195.0 / (1.0 + 0.85 * delay_sec))
+            sos_echo = signal.butter(
+                2, echo_cutoff_hz, btype="low", fs=self.sample_rate, output="sos"
+            )
+            filtered_echo = signal.sosfilt(sos_echo, direct)
+
+            # Finite building facade width smearing (10 - 22 ms Gaussian reflection kernel)
+            smear_sec = random.uniform(0.010, 0.022)
+            smear_len = max(3, int(smear_sec * self.sample_rate))
+            k_t = np.linspace(-2.0, 2.0, smear_len)
+            kernel = np.exp(-0.5 * (k_t**2))
+            kernel /= np.sum(kernel)
+            smeared_echo = signal.fftconvolve(filtered_echo, kernel, mode="same")
+
+            out[delay_samples:] += (
+                polarity * atten * smeared_echo[: n - delay_samples]
+            )
+
+        # 2. Diffuse urban canyon / terrain multi-scattering reverberation tail
+        ir_dur = min(float(n) / self.sample_rate, reverb_decay * 2.6)
+        ir_len = max(16, int(ir_dur * self.sample_rate))
+        t_ir = np.linspace(0.0, ir_dur, ir_len)
+
+        # Velvet-noise sparse random scatterers (avoids metallic comb resonances)
+        ir = np.zeros(ir_len, dtype=np.float64)
+        grid_step = max(4, int(0.0035 * self.sample_rate))
+        for g_start in range(int(0.045 * self.sample_rate), ir_len - grid_step, grid_step):
+            pulse_idx = g_start + random.randint(0, grid_step - 1)
+            ir[pulse_idx] = 1.0 if random.random() > 0.5 else -1.0
+
+        # Exponential buildup (50 ms) and reverberant canyon decay envelope
+        ir_env = (1.0 - np.exp(-t_ir / 0.050)) * np.exp(-t_ir / reverb_decay)
+        ir *= ir_env
+
+        # Low-pass filter diffuse tail below 110 Hz so building reverberation is warm & booming
+        sos_rev = signal.butter(
+            2, 110.0, btype="low", fs=self.sample_rate, output="sos"
+        )
+        ir_filtered = signal.sosfilt(sos_rev, ir)
+        ir_rms = float(np.sqrt(np.mean(ir_filtered**2)))
+        if ir_rms > 1e-9:
+            ir_filtered /= ir_rms * 18.0
+
+        diffuse_tail = signal.fftconvolve(direct, ir_filtered, mode="full")[:n]
+        out += reverb_mix * diffuse_tail
+
+        return out.astype(np.float32)
 
     def synthesize_rain_loop(
         self, duration_sec: float = SYNTH_RAIN_LOOP_DURATION_SEC

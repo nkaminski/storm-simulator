@@ -222,6 +222,37 @@ class AudioEngine:
             (scaled * math.cos(theta), scaled * math.sin(theta))
         ).astype(np.float32)
 
+        # Stereo lateral building & structure reflections:
+        # Sound waves bounce off opposite and adjacent building facades (95-420 ms delay)
+        # with additional high-frequency wall/air absorption.
+        ref_cutoff = max(60, int(round((strike.audio_lpf_hz * 0.58) / 10.0) * 10))
+        sos_ref = _get_cached_butterworth_sos(ref_cutoff, AUDIO_SAMPLE_RATE)
+        ref_sig = (
+            signal.sosfilt(sos_ref, base_mono).astype(np.float32)
+            * strike.audio_gain_linear
+        )
+        n_samples = len(stereo_buf)
+
+        # 1st lateral reflection: opposite building facade (95 - 185 ms delay)
+        delay_1 = int(random.uniform(0.095, 0.185) * AUDIO_SAMPLE_RATE)
+        if delay_1 < n_samples:
+            pan_1 = max(0.0, min(1.0, 1.0 - 0.80 * strike.stereo_pan))
+            theta_1 = pan_1 * (math.pi / 2.0)
+            gain_1 = 0.32
+            span_1 = n_samples - delay_1
+            stereo_buf[delay_1:, 0] += ref_sig[:span_1] * (gain_1 * math.cos(theta_1))
+            stereo_buf[delay_1:, 1] += ref_sig[:span_1] * (gain_1 * math.sin(theta_1))
+
+        # 2nd lateral reflection: secondary cross-canyon structure (240 - 420 ms delay)
+        delay_2 = int(random.uniform(0.240, 0.420) * AUDIO_SAMPLE_RATE)
+        if delay_2 < n_samples:
+            pan_2 = max(0.0, min(1.0, 0.5 + 0.45 * (strike.stereo_pan - 0.5)))
+            theta_2 = pan_2 * (math.pi / 2.0)
+            gain_2 = -0.20  # Phase-inverted multipath reflection
+            span_2 = n_samples - delay_2
+            stereo_buf[delay_2:, 0] += ref_sig[:span_2] * (gain_2 * math.cos(theta_2))
+            stereo_buf[delay_2:, 1] += ref_sig[:span_2] * (gain_2 * math.sin(theta_2))
+
         with self.lock:
             self.active_voices.append((stereo_buf, 0))
 

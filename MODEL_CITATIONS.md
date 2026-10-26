@@ -81,6 +81,8 @@ where:
   - *Contribution:* Demonstrated that the sharp "clap" or "peal" of close thunder is the convolution of bipolar N-wave shock pulses with a tortuous (zig-zag) lightning channel geometry, producing rapid low-midrange ($50–260\text{ Hz}$) pressure bursts rather than high-frequency white noise hiss.
 - **Bass, Henry E., Sutherland, Louis C., Zuckerwar, Allan J., Blackstock, David T., & Hester, D. Michael (1995).** *Atmospheric absorption of sound: Further developments*. [The Journal of the Acoustical Society of America, 97(1), 680–683](https://doi.org/10.1121/1.412989).
   - *Contribution:* Standard ISO 9613-1 atmospheric sound absorption model demonstrating high-frequency molecular relaxation absorption across distance.
+- **Hornikx, Maarten, & Forssén, Jens (2009).** *The 2.5-dimensional equivalent sources method for directly exposed and shielded urban canyons*. [The Journal of the Acoustical Society of America, 125(2), 665–676](https://doi.org/10.1121/1.3050254).
+  - *Contribution:* Models discrete specular reflections off building facades, edge diffraction of low-frequency sound around structures, and diffuse late reverberation tails in urban street canyons.
 
 ### Acoustic Propagation & Attenuation Formulation
 
@@ -97,8 +99,9 @@ where:
 
 This formulation prevents the steep, unrealistic volume drop-off at intermediate distances ($1–3\text{ miles}$) that plagues point-source spherical approximations.
 
-#### 2. Three-Layer Acoustic Synthesis Model
-To deliver physical accuracy matching the measured power spectrum:
+#### 2. Four-Layer Acoustic Synthesis & Environmental Reflection Model
+To deliver physical accuracy matching the measured power spectrum and outdoor structural acoustics:
 1. **Infrasonic & Sub-Bass Shockwave Body ($25–85\text{ Hz}$):** 4th-order Butterworth bandpass filtered noise modulated with a sub-bass plasma expansion wave ($28–60\text{ Hz}$), delivering $>95\%$ of total power below $100\text{ Hz}$.
 2. **Low-Mid Tortuous Channel Resonance ($55–185\text{ Hz}$):** Multi-burst acoustic packet arrivals modeling sound emitted from tortuous channel kinks at varying altitudes.
 3. **Ribner & Roy (1982) Tortuous N-Wave Shock Cluster Clap ($45–260\text{ Hz}$):** Models the close thunderclap as a rapid staccato cluster of $1/f$-tilted low-frequency pressure bursts arriving from nearby crooked channel segments over the first $15–200\text{ ms}$, driven through nonlinear shockwave compression (`tanh`) and low-pass filtered below $270–340\text{ Hz}$ to completely eliminate synthetic high-pitched hiss.
+4. **Specular Building Echoes & Diffuse Urban Canyon Reverberation:** Combines $5–7$ discrete specular reflection taps ($65\text{ ms} - 4.1\text{ s}$) with finite-facade Gaussian smearing ($10–22\text{ ms}$), delay-dependent low-pass wall absorption, a velvet-noise diffuse reverberation tail ($<110\text{ Hz}$), and real-time stereo lateral building reflections ($95–420\text{ ms}$) across opposite channels.
