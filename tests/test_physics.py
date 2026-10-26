@@ -1,5 +1,6 @@
 """test_physics.py - Simple tests for physical equations and strike generation."""
 
+from storm_sim.constants import MIN_STROKE_ON_TIME_SEC
 from storm_sim.models import StormState
 from storm_sim.physics import PhysicsEngine
 
@@ -15,6 +16,9 @@ def test_generate_strike_forced_parameters():
     assert strike.stereo_pan == 0.75
     assert len(strike.strokes) >= 1
     assert strike.strokes[0].peak_amplitude == 1.0
+    for s in strike.strokes:
+        assert s.on_time_sec >= (1.0 / 15.0)
+        assert s.duration_sec > s.on_time_sec
 
 
 def test_audio_delay_increases_with_distance():

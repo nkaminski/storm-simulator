@@ -18,6 +18,7 @@ from .constants import (
     DEFAULT_E131_HOST,
     DMX_MAX_VAL,
     MAX_PIXELS_PER_UNIVERSE,
+    MIN_STROKE_ON_TIME_SEC,
     STRIKE_ENVELOPE_TAIL_PAD_SEC,
     STROKE_DECAY_TIME_CONSTANT,
 )
@@ -207,9 +208,14 @@ class E131LightingEngine:
 
             for strike in self.active_strikes:
                 elapsed = now - strike.timestamp
+                last_stroke = strike.strokes[-1]
+                last_dur = max(
+                    last_stroke.duration_sec,
+                    getattr(last_stroke, "on_time_sec", MIN_STROKE_ON_TIME_SEC),
+                )
                 total_duration = (
-                    strike.strokes[-1].offset_sec
-                    + strike.strokes[-1].duration_sec
+                    last_stroke.offset_sec
+                    + last_dur
                     + STRIKE_ENVELOPE_TAIL_PAD_SEC
                 )
                 if elapsed > total_duration:
@@ -219,9 +225,18 @@ class E131LightingEngine:
                 temporal_amp = 0.0
                 for stroke in strike.strokes:
                     dt = elapsed - stroke.offset_sec
-                    if 0.0 <= dt <= stroke.duration_sec:
-                        decay_rate = STROKE_DECAY_TIME_CONSTANT / stroke.duration_sec
-                        stroke_env = stroke.peak_amplitude * math.exp(-decay_rate * dt)
+                    on_time = getattr(stroke, "on_time_sec", MIN_STROKE_ON_TIME_SEC)
+                    effective_dur = max(stroke.duration_sec, on_time)
+                    if 0.0 <= dt <= effective_dur:
+                        if dt <= on_time:
+                            stroke_env = stroke.peak_amplitude
+                        else:
+                            decay_dt = dt - on_time
+                            decay_window = max(0.01, effective_dur - on_time)
+                            decay_rate = STROKE_DECAY_TIME_CONSTANT / decay_window
+                            stroke_env = stroke.peak_amplitude * math.exp(
+                                -decay_rate * decay_dt
+                            )
                         temporal_amp = max(temporal_amp, stroke_env)
 
                 if temporal_amp <= 0.001:

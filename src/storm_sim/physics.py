@@ -27,6 +27,7 @@ from .constants import (
     MAX_LPF_CUTOFF_HZ,
     MIN_LPF_CUTOFF_HZ,
     MIN_PEAK_BRIGHTNESS,
+    MIN_STROKE_ON_TIME_SEC,
     OPTICAL_DISTANCE_EXPONENT,
     OPTICAL_NORM_OFFSET,
     OPTICAL_SOFTENING_DIST_MILES,
@@ -125,6 +126,8 @@ class PhysicsEngine:
         # ----------------------------------------------------------------------
         # Multi-stroke lightning flashes: an initial leader/stroke pulse followed
         # by 0 to N secondary pulses along the ionized channel.
+        # Flashes enforce a minimum on-time (>= 1/15 sec ~ 66.7 ms) so physical
+        # DMX fixtures, dimmers, and LED drivers have adequate time to strike.
         max_extra_strokes = int(round(MAX_EXTRA_STROKES_AT_PEAK * state.intensity))
         num_strokes = 1 + random.randint(0, max_extra_strokes)
         strokes: List[StrokePulse] = []
@@ -136,9 +139,18 @@ class PhysicsEngine:
                 if idx == 0
                 else random.uniform(*SECONDARY_STROKE_DURATION_RANGE_SEC)
             )
+            on_time = (
+                random.uniform(MIN_STROKE_ON_TIME_SEC, MIN_STROKE_ON_TIME_SEC * 1.35)
+                if idx == 0
+                else MIN_STROKE_ON_TIME_SEC
+            )
+            dur = max(dur, on_time + 0.04)
             strokes.append(
                 StrokePulse(
-                    offset_sec=t_cursor, duration_sec=dur, peak_amplitude=amp
+                    offset_sec=t_cursor,
+                    duration_sec=dur,
+                    peak_amplitude=amp,
+                    on_time_sec=on_time,
                 )
             )
             t_cursor += dur + random.uniform(*INTER_STROKE_GAP_RANGE_SEC)

@@ -128,17 +128,21 @@ BASE_SPATIAL_SIGMA: float = 0.035
 #: Increase in Gaussian flash width per mile of distance (distant strikes wash wide)
 SPATIAL_SIGMA_PER_MILE: float = 0.065
 
-#: Range of durations (seconds) for primary return stroke pulse
-PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.06, 0.14)
+#: Minimum duration a stroke is held in full ON state (1/15th sec ~66.7 ms) to ensure
+#: physical lighting fixtures, dimmers, and LED drivers have adequate response time to strike.
+MIN_STROKE_ON_TIME_SEC: float = 1.0 / 15.0
 
-#: Range of durations (seconds) for secondary stepped return strokes
-SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.04, 0.10)
+#: Range of durations (seconds) for primary return stroke pulse (on-time plateau + exponential decay)
+PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.12, 0.24)
+
+#: Range of durations (seconds) for secondary stepped return strokes (on-time plateau + exponential decay)
+SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.09, 0.16)
 
 #: Amplitude range for secondary return strokes relative to primary stroke (1.0)
 SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.35, 0.85)
 
 #: Time interval (seconds) between successive return strokes in a single strike
-INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (0.025, 0.075)
+INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (0.035, 0.080)
 
 #: Exponential decay constant for return stroke luminous envelope: exp(-k * dt / dur)
 STROKE_DECAY_TIME_CONSTANT: float = 4.5

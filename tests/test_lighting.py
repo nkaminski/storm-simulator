@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from storm_sim.constants import MIN_STROKE_ON_TIME_SEC
 from storm_sim.lighting import E131LightingEngine
 from storm_sim.models import StormState
 from storm_sim.physics import PhysicsEngine
@@ -37,6 +38,33 @@ def test_lighting_render_frame_and_clear():
     engine.clear_all()
     assert len(engine.active_strikes) == 0
     assert np.max(engine.last_frame_dmx) == 0
+
+
+def test_lighting_minimum_on_time_sustained():
+    """Verify lightning pulse holds full peak amplitude for >= 1/15th second before decaying."""
+    state = StormState(pixels=4, intensity=1.0)
+    engine = E131LightingEngine(state)
+    engine._configure_universes(4)
+
+    strike = PhysicsEngine.generate_strike(
+        state, now=10.0, forced_dist=0.2, forced_epicenter=0.0
+    )
+    engine.trigger_flash(strike)
+
+    # Initial frame
+    engine.render_frame(10.01)
+    peak_val_start = np.max(engine.last_frame_dmx)
+    assert peak_val_start == 255
+
+    # At exactly 1/15th second (0.0667 s), the pulse must still be sustained at full peak
+    engine.render_frame(10.0 + (1.0 / 15.0))
+    peak_val_at_15th = np.max(engine.last_frame_dmx)
+    assert peak_val_at_15th == peak_val_start
+
+    # Later during decay (e.g. at 0.16s), the pulse should have decayed below peak
+    engine.render_frame(10.16)
+    peak_val_decay = np.max(engine.last_frame_dmx)
+    assert peak_val_decay < peak_val_start
 
 
 def test_lighting_zero_intensity_ignores_flash():

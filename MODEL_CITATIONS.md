@@ -50,6 +50,18 @@ where:
 - $\alpha_{\text{ext}} = \alpha_0 + \alpha_{\text{rain}} \cdot R$ is the hydrometeor-dependent extinction coefficient (`BASE_OPTICAL_EXTINCTION`, `RAIN_OPTICAL_EXTINCTION_SCALE`),
 - Clamped to a visibility floor $I_{\text{min}} = 0.18$ (`MIN_PEAK_BRIGHTNESS`) to preserve distant horizon sheet lightning.
 
+### Temporal Optical Envelope & Fixture Response Dynamics
+While return stroke channel breakdown occurs in microseconds, channel continuing currents (30–50% of cloud-to-ground discharges; Uman 1987) and multiple cloud scattering (Thomason & Krider 1982) stretch visible illumination across 50–250 ms.
+
+Physical lighting fixtures (theatrical dimmers, moving fixtures, and LED drivers) have electrical inertia (driver capacitance, smoothing filters, and DMX frame integration windows). Pulses shorter than $1/15\text{ s}$ ($\sim 66.7\text{ ms}$, approx 3 DMX packets at 44 Hz) fail to strike or achieve significant output. The temporal envelope enforces a sustained plateau:
+
+$$A(t) = \begin{cases} A_{\text{peak}} & \text{if } 0 \le t \le t_{\text{on}} \\ A_{\text{peak}} \cdot \exp\left(-\frac{k (t - t_{\text{on}})}{t_{\text{dur}} - t_{\text{on}}}\right) & \text{if } t > t_{\text{on}} \end{cases}$$
+
+where:
+- $t_{\text{on}} \ge 1/15\text{ s}$ (`MIN_STROKE_ON_TIME_SEC`),
+- $k = 4.5$ (`STROKE_DECAY_TIME_CONSTANT`),
+- $t_{\text{dur}}$ is the total stroke duration (`PRIMARY_STROKE_DURATION_RANGE_SEC`, `SECONDARY_STROKE_DURATION_RANGE_SEC`).
+
 ---
 
 ## 3. Acoustic Wave Propagation & Thunder Mechanics

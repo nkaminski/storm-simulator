@@ -26,6 +26,7 @@ from .constants import (
     DEFAULT_START_UNIVERSE,
     INTENSITY_RATE_EXPONENT,
     INTENSITY_RAIN_EXPONENT,
+    MIN_STROKE_ON_TIME_SEC,
     ZERO_INTENSITY_EPSILON,
 )
 
@@ -41,11 +42,13 @@ class StrokePulse:
         offset_sec: Time in seconds from the start of the strike event to this pulse.
         duration_sec: Total duration in seconds of this return stroke pulse.
         peak_amplitude: Normalized luminous amplitude [0.0 to 1.0] relative to primary stroke.
+        on_time_sec: Duration in seconds to sustain peak amplitude (minimum fixture on-time).
     """
 
     offset_sec: float
     duration_sec: float
     peak_amplitude: float
+    on_time_sec: float = MIN_STROKE_ON_TIME_SEC
 
 
 @dataclass
