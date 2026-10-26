@@ -229,9 +229,9 @@ PROCEDURAL_VARIATIONS_PER_TIER: int = 3
 
 #: Synthetic thunder audio durations in seconds for each distance tier
 SYNTH_THUNDER_DURATIONS_SEC: Dict[str, float] = {
-    "close": 7.5,
-    "mid": 10.5,
-    "far": 14.0,
+    "close": 11.5,
+    "mid": 14.5,
+    "far": 18.0,
 }
 
 #: Fixed low-pass filter cutoff frequencies in Hz for procedural thunder synthesis

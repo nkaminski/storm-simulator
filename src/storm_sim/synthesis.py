@@ -137,7 +137,7 @@ class ThunderSynthesizer:
         Returns:
             1D float32 numpy array containing the synthesized mono thunderclap.
         """
-        dur = SYNTH_THUNDER_DURATIONS_SEC.get(tier, 7.5)
+        dur = SYNTH_THUNDER_DURATIONS_SEC.get(tier, 11.5)
         n = int(self.sample_rate * dur)
         t = np.linspace(0.0, dur, n, dtype=np.float32)
 
@@ -239,16 +239,16 @@ class ThunderSynthesizer:
             bamp = random.uniform(0.30, 0.70) * np.exp(-bt / (max_burst_span * 1.2))
             sub_env += bamp * np.exp(-((t - bt) ** 2) / (2.0 * (bw**2)))
 
-        # Infrasonic tail (20 - 52 Hz) with fast, natural decay (fades cleanly by 3-4s)
+        # Infrasonic tail (20 - 52 Hz) with natural decay, allowing full rumble to subside cleanly
         infra_env = (1.0 - np.exp(-t / 0.18)) * np.exp(-t / infra_tail_decay)
-        for _ in range(random.randint(3, 5)):
-            bt_i = random.uniform(0.8, min(dur * 0.5, 3.2))
-            bw_i = random.uniform(0.40, 0.90)
-            bamp_i = random.uniform(0.25, 0.55) * np.exp(-bt_i / (dur * 0.5))
+        for _ in range(random.randint(4, 7)):
+            bt_i = random.uniform(0.8, min(dur * 0.70, 7.5))
+            bw_i = random.uniform(0.40, 1.10)
+            bamp_i = random.uniform(0.25, 0.55) * np.exp(-bt_i / (dur * 0.65))
             infra_env += bamp_i * np.exp(-((t - bt_i) ** 2) / (2.0 * (bw_i**2)))
 
-        # Smooth cosine fade-out on final 1.0s so tail ends cleanly
-        fade_len = int(1.0 * self.sample_rate)
+        # Smooth cosine fade-out on final 1.5s so tail ends cleanly without premature truncation
+        fade_len = int(1.5 * self.sample_rate)
         if fade_len < n:
             fade_win = np.ones(n, dtype=np.float32)
             fade_win[-fade_len:] = 0.5 * (1.0 + np.cos(np.linspace(0.0, np.pi, fade_len)))
