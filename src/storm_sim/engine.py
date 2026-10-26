@@ -50,6 +50,7 @@ class StormCoordinator:
         assets_dir: Optional[Path] = None,
         osc_host: str = DEFAULT_OSC_HOST,
         osc_port: int = DEFAULT_OSC_PORT,
+        small_speakers: bool = False,
     ):
         """Initializes coordinator with lighting, audio, and OSC subsystems.
 
@@ -58,10 +59,11 @@ class StormCoordinator:
             assets_dir: Optional path to audio samples directory.
             osc_host: Network interface for OSC UDP server (default: 0.0.0.0).
             osc_port: Port for OSC UDP server (default: 5005).
+            small_speakers: If True, tunes procedural thunder for small speaker drivers.
         """
         self.state = state
         self.lighting = E131LightingEngine(state)
-        self.audio = AudioEngine(state, assets_dir)
+        self.audio = AudioEngine(state, assets_dir, small_speakers=small_speakers)
         self.osc = OSCController(
             state,
             self.trigger_strike_now,

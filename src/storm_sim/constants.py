@@ -190,16 +190,16 @@ ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR: float = 11.0
 INTENSITY_ACOUSTIC_BOOST_DB: float = 3.0
 
 #: Floor cutoff frequency for atmospheric low-pass filter (deep sub-bass rumbles)
-MIN_LPF_CUTOFF_HZ: float = 75.0
+MIN_LPF_CUTOFF_HZ: float = 95.0
 
-#: Ceiling cutoff frequency for atmospheric low-pass filter (close low-midrange thunderclaps)
-MAX_LPF_CUTOFF_HZ: float = 420.0
+#: Ceiling cutoff frequency for atmospheric low-pass filter (close dry thunderclaps up to 2.8 kHz)
+MAX_LPF_CUTOFF_HZ: float = 2800.0
 
 #: Reference numerator for distance-dependent low-pass filter cutoff calculation
-LPF_REFERENCE_NUMERATOR_HZ: float = 280.0
+LPF_REFERENCE_NUMERATOR_HZ: float = 1200.0
 
 #: High-frequency roll-off factor per mile of distance
-LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.15
+LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.25
 
 #: IIR Butterworth low-pass filter order (12 dB/octave attenuation)
 BUTTERWORTH_FILTER_ORDER: int = 2
@@ -229,17 +229,32 @@ PROCEDURAL_VARIATIONS_PER_TIER: int = 3
 
 #: Synthetic thunder audio durations in seconds for each distance tier
 SYNTH_THUNDER_DURATIONS_SEC: Dict[str, float] = {
-    "close": 6.0,
-    "mid": 11.0,
-    "far": 16.0,
+    "close": 7.5,
+    "mid": 10.5,
+    "far": 14.0,
 }
 
 #: Fixed low-pass filter cutoff frequencies in Hz for procedural thunder synthesis
 SYNTH_THUNDER_LPF_HZ: Dict[str, float] = {
-    "close": 340.0,
-    "mid": 210.0,
-    "far": 120.0,
+    "close": 2650.0,
+    "mid": 1100.0,
+    "far": 240.0,
 }
+
+#: Standard sub-bass frequency band in Hz for procedural thunder synthesis (for full-range systems with subwoofers)
+SYNTH_SUB_BASS_BAND_HZ: Tuple[float, float] = (20.0, 82.0)
+
+#: Raised sub-bass frequency band in Hz for compact speakers lacking subwoofers
+SYNTH_SUB_BASS_BAND_SMALL_SPEAKERS_HZ: Tuple[float, float] = (48.0, 140.0)
+
+#: Standard infrasonic rolling tail frequency band in Hz
+SYNTH_INFRA_BAND_HZ: Tuple[float, float] = (20.0, 52.0)
+
+#: Raised infrasonic rolling tail frequency band in Hz for compact speakers
+SYNTH_INFRA_BAND_SMALL_SPEAKERS_HZ: Tuple[float, float] = (45.0, 95.0)
+
+#: Default setting for compact speaker infrasonic frequency elevation
+DEFAULT_SMALL_SPEAKERS: bool = False
 
 #: Total duration in seconds of the procedural seamless rain loop
 SYNTH_RAIN_LOOP_DURATION_SEC: float = 12.0

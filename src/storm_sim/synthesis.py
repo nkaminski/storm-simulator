@@ -19,6 +19,7 @@ import soundfile as sf
 from .constants import (
     AUDIO_SAMPLE_RATE,
     BUTTERWORTH_FILTER_ORDER,
+    DEFAULT_SMALL_SPEAKERS,
     PROCEDURAL_VARIATIONS_PER_TIER,
     SAMPLE_PEAK_NORMALIZE_TARGET,
     SYNTH_BURST_AMP_RANGE,
@@ -28,10 +29,14 @@ from .constants import (
     SYNTH_CLOSE_INITIAL_SNAP_AMP,
     SYNTH_CLOSE_INITIAL_SNAP_DECAY,
     SYNTH_FAR_DECAY_TIME,
+    SYNTH_INFRA_BAND_HZ,
+    SYNTH_INFRA_BAND_SMALL_SPEAKERS_HZ,
     SYNTH_RAIN_BANDPASS_HZ,
     SYNTH_RAIN_CROSSFADE_SEC,
     SYNTH_RAIN_LOOP_DURATION_SEC,
     SYNTH_RAIN_NOISE_AMPLITUDE,
+    SYNTH_SUB_BASS_BAND_HZ,
+    SYNTH_SUB_BASS_BAND_SMALL_SPEAKERS_HZ,
     SYNTH_THUNDER_BURSTS_RANGE,
     SYNTH_THUNDER_DURATIONS_SEC,
     SYNTH_THUNDER_LPF_HZ,
@@ -51,29 +56,37 @@ class ThunderSynthesizer:
         sample_rate: Target sample rate in Hz (default: 44100).
     """
 
-    def __init__(self, sample_rate: int = AUDIO_SAMPLE_RATE):
+    def __init__(
+        self,
+        sample_rate: int = AUDIO_SAMPLE_RATE,
+        small_speakers: bool = DEFAULT_SMALL_SPEAKERS,
+    ):
         """Initializes the procedural synthesizer.
 
         Args:
             sample_rate: Target audio sample rate in Hz.
+            small_speakers: If True, tunes infrasonic/sub-bass frequencies higher (48-140 Hz)
+                with harmonic overtone saturation for compact speakers lacking subwoofers.
         """
         self.sample_rate = sample_rate
+        self.small_speakers = small_speakers
 
     def synthesize_thunder(self, tier: str) -> np.ndarray:
         """Synthesizes an authentic, floor-shaking multi-layer thunderclap for a given distance tier.
 
         Grounded in empirical thunder acoustics (Few 1969; Holmes et al. 1971; Ribner & Roy 1982):
-        1. Infrasonic & Sub-Bass Cylindrical Shockwave Body (25 Hz - 85 Hz):
+        1. Infrasonic & Sub-Bass Cylindrical Shockwave Body (20 Hz - 85 Hz):
            Plasma channel expansion wave producing dominant acoustic power density (>90% of power
-           below 100 Hz) in the wall-shaking sub-bass region.
+           below 100 Hz) in the wall-shaking sub-bass region. When small_speakers is active,
+           elevates to 48-140 Hz with harmonic saturation for playback on compact monitors.
         2. Low-Frequency Tortuous Channel Resonance & Echoes (55 Hz - 190 Hz):
            Multi-burst packet arrivals modeling tortuous channel kinks across kilometers with natural
            1/f^2 spectral roll-off.
-        3. Tortuous N-Wave Shock Cluster Clap (Close and Mid tiers, 45 Hz - 260 Hz):
-           Models the initial close thunderclap via Ribner & Roy (1982) superposition of
-           band-limited bipolar N-wave pressure bursts from crooked channel segments, with
-           nonlinear shock steepening (tanh) and steep low-pass filtering (<320 Hz) to eliminate
-           synthetic high-pitched hiss.
+        3. Tortuous N-Wave Shock Cluster Clap (Close and Mid tiers, 90 Hz - 2400 Hz):
+           Single dominant, explosive primary crack followed by much quieter secondary return-stroke
+           kinks (eliminating repetitive clicks) with calibrated multi-band saturation.
+        4. Environmental Building Reflections & Canyon Reverberation:
+           Smeared specular facade slapbacks and diffuse horizon reverberation.
 
         Args:
             tier: Distance tier string: 'close', 'mid', or 'far'.
@@ -81,65 +94,126 @@ class ThunderSynthesizer:
         Returns:
             1D float32 numpy array containing the synthesized mono thunderclap.
         """
-        dur = SYNTH_THUNDER_DURATIONS_SEC.get(tier, 8.0)
+        dur = SYNTH_THUNDER_DURATIONS_SEC.get(tier, 7.5)
         n = int(self.sample_rate * dur)
         t = np.linspace(0.0, dur, n, dtype=np.float32)
 
         # ----------------------------------------------------------------------
-        # Layer 1: Infrasonic & Sub-Bass Shockwave Body (25 - 85 Hz)
+        # Layer 1: Infrasonic & Sub-Bass Shockwave Body
         # Dominates total acoustic energy (>90% of power in 20-100 Hz band).
+        # In small_speakers mode, elevates to 48-140 Hz for compact monitors.
         # ----------------------------------------------------------------------
+        sub_band = (
+            SYNTH_SUB_BASS_BAND_SMALL_SPEAKERS_HZ
+            if self.small_speakers
+            else SYNTH_SUB_BASS_BAND_HZ
+        )
+        infra_band = (
+            SYNTH_INFRA_BAND_SMALL_SPEAKERS_HZ
+            if self.small_speakers
+            else SYNTH_INFRA_BAND_HZ
+        )
+
         white_sub = np.random.normal(0.0, 1.0, n).astype(np.float32)
         sos_sub = signal.butter(
-            4, [25.0, 85.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            4, list(sub_band), btype="bandpass", fs=self.sample_rate, output="sos"
         )
         sub_noise = signal.sosfilt(sos_sub, white_sub)
 
-        # Deep sub-bass plasma expansion wave (kept strictly below 65 Hz)
-        attack_ramp = 1.0 - np.exp(-t / 0.008)
-        if tier == "close":
-            exp_env = attack_ramp * np.exp(-t / 0.65)
-            exp_freq = 36.0 + 24.0 * np.exp(-t / 0.12)
-            boom = (
-                np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
-                * exp_env
-                * 2.2
-            )
-            sub_decay = 2.4
-        elif tier == "mid":
-            exp_env = attack_ramp * np.exp(-t / 1.1)
-            exp_freq = 33.0 + 18.0 * np.exp(-t / 0.18)
-            boom = (
-                np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
-                * exp_env
-                * 1.6
-            )
-            sub_decay = 3.8
-        else:  # far
-            exp_env = attack_ramp * np.exp(-t / 1.8)
-            exp_freq = 28.0 + 14.0 * np.exp(-t / 0.25)
-            boom = (
-                np.sin(2.0 * np.pi * np.cumsum(exp_freq) / self.sample_rate)
-                * exp_env
-                * 1.1
-            )
-            sub_decay = 5.5
-
-        # Tortuous channel secondary bursts (interference from segments at different heights)
-        sub_env = attack_ramp * np.exp(-t / sub_decay)
-        min_bursts, max_bursts = SYNTH_THUNDER_BURSTS_RANGE
-        n_bursts = (
-            random.randint(min_bursts, max_bursts)
-            if tier != "far"
-            else random.randint(6, 12)
+        # Deep infrasonic/sub-bass rolling tail carrier from upper channel & horizon
+        white_infra = np.random.normal(0.0, 1.0, n).astype(np.float32)
+        sos_infra = signal.butter(
+            4, list(infra_band), btype="bandpass", fs=self.sample_rate, output="sos"
         )
+        infra_noise = signal.sosfilt(sos_infra, white_infra)
+
+        # Infrasonic/Sub-bass plasma expansion wave pulses (1 to 3 distinct return-stroke booms)
+        attack_ramp = 1.0 - np.exp(-t / 0.012)
+        n_booms = random.randint(1, 3)
+        boom = np.zeros(n, dtype=np.float32)
+        boom_times = []
+        if tier == "close":
+            sub_decay = 1.8
+            infra_tail_decay = 2.4
+        elif tier == "mid":
+            sub_decay = 3.2
+            infra_tail_decay = 4.5
+        else:  # far
+            sub_decay = 5.0
+            infra_tail_decay = 7.0
+
+        t_boom = 0.0
+        for b_idx in range(n_booms):
+            boom_times.append(t_boom)
+            dt_b = t - t_boom
+            mask_b = dt_b >= 0.0
+            dt_bp = dt_b[mask_b]
+            attack_b = 1.0 - np.exp(-dt_bp / 0.012)
+            if self.small_speakers:
+                # Elevated sub-bass chirp profile (50-95 Hz) audible on small bookshelf/desktop drivers
+                if tier == "close":
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(0.42, 0.65))
+                    b_freq = (56.0 + random.uniform(-4.0, 4.0)) + 38.0 * np.exp(-dt_bp / 0.12)
+                    b_gain = 2.2 if b_idx == 0 else random.uniform(1.2, 1.7)
+                elif tier == "mid":
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(0.70, 1.05))
+                    b_freq = (50.0 + random.uniform(-4.0, 4.0)) + 28.0 * np.exp(-dt_bp / 0.18)
+                    b_gain = 1.6 if b_idx == 0 else random.uniform(1.0, 1.4)
+                else:  # far
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(1.2, 1.7))
+                    b_freq = (44.0 + random.uniform(-3.0, 3.0)) + 20.0 * np.exp(-dt_bp / 0.25)
+                    b_gain = 1.1 if b_idx == 0 else random.uniform(0.7, 1.0)
+            else:
+                # Standard true infrasonic/sub-bass chirp (24-58 Hz) for subwoofers/full-range systems
+                if tier == "close":
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(0.42, 0.65))
+                    b_freq = (34.0 + random.uniform(-3.0, 3.0)) + 22.0 * np.exp(-dt_bp / 0.12)
+                    b_gain = 2.2 if b_idx == 0 else random.uniform(1.2, 1.7)
+                elif tier == "mid":
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(0.70, 1.05))
+                    b_freq = (30.0 + random.uniform(-3.0, 3.0)) + 16.0 * np.exp(-dt_bp / 0.18)
+                    b_gain = 1.6 if b_idx == 0 else random.uniform(1.0, 1.4)
+                else:  # far
+                    b_env = attack_b * np.exp(-dt_bp / random.uniform(1.2, 1.7))
+                    b_freq = (26.0 + random.uniform(-2.0, 2.0)) + 12.0 * np.exp(-dt_bp / 0.25)
+                    b_gain = 1.1 if b_idx == 0 else random.uniform(0.7, 1.0)
+
+            phase = 2.0 * np.pi * np.cumsum(b_freq) / self.sample_rate
+            boom[mask_b] += np.sin(phase) * b_env * b_gain
+            t_boom += random.uniform(0.12, 0.28)
+
+        if self.small_speakers:
+            # Subtle soft-clip saturation adds 2nd & 3rd harmonic overtones audible on compact speakers
+            boom = np.tanh(boom * 1.35)
+
+        # Tortuous channel secondary bursts (interference from upper segments)
+        sub_env = attack_ramp * np.exp(-t / sub_decay)
+        n_bursts = random.randint(4, 7) if tier == "close" else random.randint(6, 10)
+        max_burst_span = min(dur * 0.45, 2.5) if tier == "close" else dur * 0.65
         for _ in range(n_bursts):
-            bt = random.uniform(0.15, dur * SYNTH_BURST_TIME_SPAN_FACTOR)
-            bw = random.uniform(*SYNTH_BURST_WIDTH_RANGE_SEC)
-            bamp = random.uniform(*SYNTH_BURST_AMP_RANGE)
+            bt = random.uniform(0.20, max_burst_span)
+            bw = random.uniform(0.25, 0.75)
+            bamp = random.uniform(0.30, 0.70) * np.exp(-bt / (max_burst_span * 1.2))
             sub_env += bamp * np.exp(-((t - bt) ** 2) / (2.0 * (bw**2)))
 
-        sub_layer = (sub_noise * 3.4 * sub_env) + boom
+        # Infrasonic tail (20 - 52 Hz) with fast, natural decay (fades cleanly by 3-4s)
+        infra_env = (1.0 - np.exp(-t / 0.18)) * np.exp(-t / infra_tail_decay)
+        for _ in range(random.randint(3, 5)):
+            bt_i = random.uniform(0.8, min(dur * 0.5, 3.2))
+            bw_i = random.uniform(0.40, 0.90)
+            bamp_i = random.uniform(0.25, 0.55) * np.exp(-bt_i / (dur * 0.5))
+            infra_env += bamp_i * np.exp(-((t - bt_i) ** 2) / (2.0 * (bw_i**2)))
+
+        # Smooth cosine fade-out on final 1.0s so tail ends cleanly
+        fade_len = int(1.0 * self.sample_rate)
+        if fade_len < n:
+            fade_win = np.ones(n, dtype=np.float32)
+            fade_win[-fade_len:] = 0.5 * (1.0 + np.cos(np.linspace(0.0, np.pi, fade_len)))
+            sub_env *= fade_win
+            infra_env *= fade_win
+
+        sub_layer = (sub_noise * 3.0 * sub_env) + (infra_noise * 3.2 * infra_env) + boom
+        sub_layer = sub_layer / max(float(np.max(np.abs(sub_layer))), 1e-6)
 
         # ----------------------------------------------------------------------
         # Layer 2: Low-Mid Tortuous Resonance & Channel Echoes (55 - 185 Hz)
@@ -155,68 +229,130 @@ class ThunderSynthesizer:
             bw = random.uniform(0.10, 0.38)
             bamp = random.uniform(0.35, 0.80)
             mid_env += bamp * np.exp(-((t - bt) ** 2) / (2.0 * (bw**2)))
-        mid_layer = mid_noise * 1.4 * mid_env
+        mid_layer = mid_noise * mid_env
+        mid_layer = mid_layer / max(float(np.max(np.abs(mid_layer))), 1e-6)
 
         # ----------------------------------------------------------------------
-        # Layer 3: Ribner & Roy (1982) Tortuous N-Wave Shock Cluster Clap (45 - 260 Hz)
-        # Models close thunderclaps as a ragged cluster of low-frequency N-wave
-        # pressure bursts from nearby channel kinks, with zero high-pitched hiss.
+        # Layer 3: Multi-Band Dry Thunder Crack & Stepped-Leader Tear (90 - 2400 Hz)
+        # Calibrated directly against empirical analysis of dry-thunder3.wav:
+        #   - Stepped-Leader Tearing Prelude (0.01 - 0.16s, 350 - 2350 Hz):
+        #     Staccato, high-crest-factor micro-snaps preceding the main shockwave.
+        #   - Low-Bark (90 - 250 Hz, Crest ~6.1): Nonlinear shock-steepened artillery punch.
+        #   - Mid-Crack (250 - 700 Hz, Crest ~5.1): Dry, woody explosive crack body.
+        #   - High-Tear (700 - 2350 Hz, Crest ~8.3, Kurtosis ~7.0): Super-Gaussian spiky
+        #     crackle gated to the leading edges of each shockwave kink, rolling off
+        #     steeply above 2.4 kHz (<0.05% energy >3 kHz) to avoid white-noise hiss.
         # ----------------------------------------------------------------------
         if tier in ("close", "mid"):
-            white_clap = np.random.normal(0.0, 1.0, n).astype(np.float32)
-            clap_band = [45.0, 250.0] if tier == "close" else [40.0, 165.0]
-            sos_clap_bp = signal.butter(
-                3, clap_band, btype="bandpass", fs=self.sample_rate, output="sos"
-            )
-            # Apply 1/f spectral tilt via additional 1st-order low-pass at 95 Hz
-            sos_tilt = signal.butter(
-                1, 95.0, btype="low", fs=self.sample_rate, output="sos"
-            )
-            clap_carrier = signal.sosfilt(
-                sos_tilt, signal.sosfilt(sos_clap_bp, white_clap)
-            )
-            clap_carrier = clap_carrier / max(float(np.std(clap_carrier)), 1e-6)
+            # Generate 3 band-limited carriers matching dry-thunder3.wav sub-bands
+            w1 = np.random.normal(0.0, 1.0, n).astype(np.float32)
+            w2 = np.random.normal(0.0, 1.0, n).astype(np.float32)
+            w3 = np.random.normal(0.0, 1.0, n).astype(np.float32)
 
-            clap_env = np.zeros(n, dtype=np.float32)
-            n_kinks = random.randint(5, 8) if tier == "close" else random.randint(3, 5)
-            t_kink = 0.006
-            for k_idx in range(n_kinks):
-                width = random.uniform(0.008, 0.024) if tier == "close" else random.uniform(0.015, 0.040)
-                amp = (1.0 if k_idx < 2 else random.uniform(0.45, 0.90)) * np.exp(-t_kink / 0.16)
-                # Asymmetric pulse envelope: rapid rise (4-8 ms), slower pressure tail
-                dt_k = t - t_kink
-                mask = dt_k >= 0.0
-                dt_pos = dt_k[mask]
-                pulse = (1.0 - np.exp(-dt_pos / 0.004)) * np.exp(-dt_pos / width)
-                clap_env[mask] += amp * pulse
-                t_kink += random.uniform(0.012, 0.038)
+            sos_bark = signal.butter(
+                3, [90.0, 250.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            )
+            sos_midc = signal.butter(
+                3, [250.0, 700.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            )
+            sos_tear = signal.butter(
+                3, [700.0, 2350.0], btype="bandpass", fs=self.sample_rate, output="sos"
+            )
 
-            # Nonlinear shockwave compression (tanh) followed by steep LPF to strip synthetic harmonics
-            raw_clap = np.tanh(clap_carrier * clap_env * (2.2 if tier == "close" else 1.4))
-            sos_clap_lpf = signal.butter(
-                4,
-                270.0 if tier == "close" else 175.0,
-                btype="low",
-                fs=self.sample_rate,
-                output="sos",
+            c_bark = signal.sosfilt(sos_bark, w1)
+            c_midc = signal.sosfilt(sos_midc, w2)
+            c_tear = signal.sosfilt(sos_tear, w3)
+
+            # Smooth natural tearing modulation on high-tear band without isolated sample click spikes
+            w_mod = np.random.normal(0.0, 1.0, n).astype(np.float32)
+            sos_mod = signal.butter(
+                2, [45.0, 280.0], btype="bandpass", fs=self.sample_rate, output="sos"
             )
-            crack_layer = signal.sosfilt(sos_clap_lpf, raw_clap) * (
-                2.4 if tier == "close" else 1.1
+            grain_mod = np.abs(signal.sosfilt(sos_mod, w_mod))
+            grain_mod = np.tanh(grain_mod / max(float(np.std(grain_mod)), 1e-6))
+            c_tear = c_tear * (0.55 + 0.90 * grain_mod)
+
+            env_bark = np.zeros(n, dtype=np.float32)
+            env_midc = np.zeros(n, dtype=np.float32)
+            env_tear = np.zeros(n, dtype=np.float32)
+
+            # Return-stroke shockwave claps:
+            # Primary strike (c_idx == 0) is MUCH louder than all subsequent secondary kinks/strokes
+            n_claps = len(boom_times) if boom_times else (1 if tier == "close" else 2)
+            for c_idx in range(n_claps):
+                t_clap = boom_times[c_idx] if c_idx < len(boom_times) else 0.0
+                dt_c = t - t_clap
+                mask_c = (dt_c >= 0.0) & (dt_c <= 0.75)
+                dt_cp = dt_c[mask_c]
+
+                if c_idx == 0:
+                    # Dominant explosive primary crack (much louder than all other pulses)
+                    c_amp = 1.0
+                    w_bark = random.uniform(0.045, 0.080)
+                    w_midc = random.uniform(0.035, 0.065)
+                    w_tear = random.uniform(0.020, 0.038)
+                else:
+                    # Secondary return strokes are much softer (0.20-0.28) with subtle high tear
+                    c_amp = random.uniform(0.18, 0.28) * (0.65 ** c_idx)
+                    w_bark = random.uniform(0.028, 0.048)
+                    w_midc = random.uniform(0.020, 0.032)
+                    w_tear = random.uniform(0.008, 0.015)
+
+                env_bark[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.006)) * np.exp(-dt_cp / w_bark)
+                env_midc[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.005)) * np.exp(-dt_cp / w_midc)
+                env_tear[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.004)) * np.exp(-dt_cp / w_tear)
+
+            # Shape each band with soft-saturation to match dry-thunder3.wav crest factors (5.0 - 8.3)
+            sig_bark = np.tanh(
+                (c_bark / max(float(np.std(c_bark)), 1e-6)) * env_bark * 0.75
             )
+            sig_bark = sig_bark / max(float(np.max(np.abs(sig_bark))), 1e-6)
+
+            sig_midc = np.tanh(
+                (c_midc / max(float(np.std(c_midc)), 1e-6)) * env_midc * 0.80
+            )
+            sig_midc = sig_midc / max(float(np.max(np.abs(sig_midc))), 1e-6)
+
+            sig_tear = np.tanh(
+                (c_tear / max(float(np.std(c_tear)), 1e-6)) * env_tear * 0.65
+            )
+            sig_tear = sig_tear / max(float(np.max(np.abs(sig_tear))), 1e-6)
+
+            if tier == "close":
+                crack_raw = (sig_bark * 0.85) + (sig_midc * 0.68) + (sig_tear * 0.56)
+                cutoff_crack = 2450.0
+            else:  # mid
+                crack_raw = (sig_bark * 0.55) + (sig_midc * 0.35) + (sig_tear * 0.16)
+                cutoff_crack = 1050.0
+
+            sos_crack_lpf = signal.butter(
+                4, cutoff_crack, btype="low", fs=self.sample_rate, output="sos"
+            )
+            crack_layer = signal.sosfilt(sos_crack_lpf, crack_raw)
         else:
             crack_layer = np.zeros(n, dtype=np.float32)
-
-        # Composite multi-layer acoustic mix
-        direct_composite = (
-            (sub_layer * 0.80) + (mid_layer * 0.35) + (crack_layer * 0.45)
-        )
 
         # ----------------------------------------------------------------------
         # Layer 4: Environmental Building Echoes & Urban Canyon Reverberation
         # Models discrete specular reflections off nearby/mid-field building facades
         # and structures plus diffuse urban canyon / terrain late reverberation.
         # ----------------------------------------------------------------------
-        reverberant = self._apply_environmental_reflections(direct_composite, tier)
+        low_body = (sub_layer * 0.85) + (mid_layer * 0.35)
+        rev_body = self._apply_environmental_reflections(low_body, tier)
+        rev_body = rev_body / max(float(np.max(np.abs(rev_body))), 1e-6)
+
+        if tier in ("close", "mid"):
+            rev_crack = self._apply_crack_building_echoes(crack_layer, tier)
+            rev_crack = rev_crack / max(float(np.max(np.abs(rev_crack))), 1e-6)
+            rev_crack = np.tanh(rev_crack * 1.35)
+            rev_crack = rev_crack / max(float(np.max(np.abs(rev_crack))), 1e-6)
+            if tier == "close":
+                # Keep scary infrasonic/sub-bass strong (0.68) alongside dry-thunder3.wav sharp crack (1.05)
+                composite = (rev_body * 0.68) + (rev_crack * 1.05)
+            else:
+                composite = (rev_body * 0.82) + (rev_crack * 0.58)
+        else:
+            composite = rev_body
 
         sos_master_lpf = signal.butter(
             3,
@@ -225,10 +361,49 @@ class ThunderSynthesizer:
             fs=self.sample_rate,
             output="sos",
         )
-        composite = signal.sosfilt(sos_master_lpf, reverberant)
+        composite = signal.sosfilt(sos_master_lpf, composite)
         peak = float(np.max(np.abs(composite)))
         normalized = (composite / max(peak, 1e-6)) * SAMPLE_PEAK_NORMALIZE_TARGET
         return normalized.astype(np.float32)
+
+    def _apply_crack_building_echoes(
+        self, crack: np.ndarray, tier: str
+    ) -> np.ndarray:
+        """Applies discrete specular building facade echoes to the mid/high thunder crack.
+
+        Preserves the 120-1600 Hz slapback and multi-building echoes of a sharp thunderclap
+        bouncing off nearby structures without swamping it in sub-bass reverberation.
+        """
+        n = len(crack)
+        out = crack.copy().astype(np.float64)
+        tap_delays = [
+            (0.080, 0.150, 0.38, 1400.0),
+            (0.220, 0.380, 0.25, 850.0),
+            (0.480, 0.780, 0.16, 520.0),
+        ]
+        for idx, (d_min, d_max, gain, lpf_hz) in enumerate(tap_delays):
+            delay_sec = random.uniform(d_min, d_max)
+            delay_samples = int(delay_sec * self.sample_rate)
+            if delay_samples >= n:
+                continue
+            sos_e = signal.butter(
+                2,
+                lpf_hz if tier == "close" else lpf_hz * 0.6,
+                btype="low",
+                fs=self.sample_rate,
+                output="sos",
+            )
+            echo_sig = signal.sosfilt(sos_e, crack)
+            smear_len = max(3, int(0.012 * self.sample_rate))
+            k_t = np.linspace(-2.0, 2.0, smear_len)
+            kernel = np.exp(-0.5 * (k_t**2))
+            kernel /= np.sum(kernel)
+            smeared_echo = signal.fftconvolve(echo_sig, kernel, mode="same")
+            polarity = -1.0 if (idx % 2 == 1) else 1.0
+            out[delay_samples:] += (
+                polarity * gain * random.uniform(0.8, 1.2) * smeared_echo[: n - delay_samples]
+            )
+        return out.astype(np.float32)
 
     def _apply_environmental_reflections(
         self, direct: np.ndarray, tier: str
@@ -265,11 +440,13 @@ class ThunderSynthesizer:
                 (0.560, 0.850),
                 (0.920, 1.350),
                 (1.420, 1.950),
-                (2.050, 2.650),
+                (2.050, 2.750),
+                (2.900, 3.800),
+                (4.000, 5.200),
             ]
-            base_echo_gain = 0.42
-            reverb_decay = 0.95
-            reverb_mix = 0.28
+            base_echo_gain = 0.44
+            reverb_decay = 2.40
+            reverb_mix = 0.36
         elif tier == "mid":
             delay_zones = [
                 (0.090, 0.210),
@@ -278,10 +455,12 @@ class ThunderSynthesizer:
                 (0.880, 1.350),
                 (1.450, 2.100),
                 (2.200, 3.100),
+                (3.300, 4.500),
+                (4.700, 6.200),
             ]
             base_echo_gain = 0.46
-            reverb_decay = 1.45
-            reverb_mix = 0.34
+            reverb_decay = 2.95
+            reverb_mix = 0.40
         else:  # far
             delay_zones = [
                 (0.140, 0.350),
@@ -289,10 +468,12 @@ class ThunderSynthesizer:
                 (0.950, 1.600),
                 (1.750, 2.700),
                 (2.850, 4.100),
+                (4.300, 5.800),
+                (6.000, 7.800),
             ]
             base_echo_gain = 0.50
-            reverb_decay = 2.10
-            reverb_mix = 0.40
+            reverb_decay = 3.60
+            reverb_mix = 0.45
 
         for idx, (d_min, d_max) in enumerate(delay_zones):
             delay_sec = random.uniform(d_min, d_max)
@@ -309,7 +490,8 @@ class ThunderSynthesizer:
             polarity = -1.0 if (idx % 2 == 1) else 1.0
 
             # Progressive wall/air absorption LPF: later reflections are darker and deeper
-            echo_cutoff_hz = max(58.0, 195.0 / (1.0 + 0.85 * delay_sec))
+            base_echo_hz = 580.0 if tier == "close" else (320.0 if tier == "mid" else 185.0)
+            echo_cutoff_hz = max(58.0, base_echo_hz / (1.0 + 1.15 * delay_sec))
             sos_echo = signal.butter(
                 2, echo_cutoff_hz, btype="low", fs=self.sample_rate, output="sos"
             )
@@ -474,13 +656,20 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         default=AUDIO_SAMPLE_RATE,
         help="Audio sample rate in Hz (default: 44100)",
     )
+    parser.add_argument(
+        "--small-speakers",
+        action="store_true",
+        help="Tune infrasonics/sub-bass higher (48-140 Hz with saturation) for compact speakers lacking subwoofers",
+    )
     return parser.parse_args(args)
 
 
 def main(args: Optional[List[str]] = None) -> None:
     """CLI entry point for pre-rendering soundbank WAV files to disk."""
     parsed = parse_args(args)
-    synth = ThunderSynthesizer(sample_rate=parsed.sample_rate)
+    synth = ThunderSynthesizer(
+        sample_rate=parsed.sample_rate, small_speakers=parsed.small_speakers
+    )
     synth.export_soundbank(
         output_dir=parsed.output_dir, variations_per_tier=parsed.variations
     )

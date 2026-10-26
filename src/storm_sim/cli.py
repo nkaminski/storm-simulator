@@ -153,6 +153,11 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Launch the desktop hardware visualizer and control UI",
     )
+    parser.add_argument(
+        "--small-speakers",
+        action="store_true",
+        help="Tune infrasonics/sub-bass higher (48-140 Hz with saturation) for compact speakers lacking subwoofers",
+    )
     parsed = parser.parse_args(args)
     if parsed.passthrough:
         try:
@@ -192,7 +197,11 @@ def main(args: Optional[List[str]] = None) -> None:
     )
 
     coordinator = StormCoordinator(
-        state, parsed.assets_dir, parsed.osc_host, parsed.osc_port
+        state,
+        parsed.assets_dir,
+        parsed.osc_host,
+        parsed.osc_port,
+        small_speakers=parsed.small_speakers,
     )
 
     if parsed.ui:

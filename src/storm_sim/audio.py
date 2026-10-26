@@ -72,15 +72,22 @@ class AudioEngine:
         stream: Optional sounddevice.OutputStream for hardware audio output.
     """
 
-    def __init__(self, state: StormState, assets_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        state: StormState,
+        assets_dir: Optional[Path] = None,
+        small_speakers: bool = False,
+    ):
         """Initializes the audio mixer, loads or synthesizes assets, and opens the audio stream.
 
         Args:
             state: Shared StormState configuration.
             assets_dir: Directory containing 'close', 'mid', 'far' subfolders and rain WAV.
+            small_speakers: If True, procedural synthesis elevates infrasonics (48-140 Hz) for compact drivers.
         """
         self.state = state
         self.assets_dir = assets_dir
+        self.small_speakers = small_speakers
         self.lock = threading.Lock()
         self.active_voices: List[Tuple[np.ndarray, int]] = []
 
@@ -151,7 +158,9 @@ class AudioEngine:
                 self.rain_loop = signal.sosfilt(sos, data[:, :2], axis=0).astype(np.float32)
 
         # Procedural fallback synthesis via dedicated ThunderSynthesizer
-        synth = ThunderSynthesizer(sample_rate=AUDIO_SAMPLE_RATE)
+        synth = ThunderSynthesizer(
+            sample_rate=AUDIO_SAMPLE_RATE, small_speakers=self.small_speakers
+        )
         for tier in ("close", "mid", "far"):
             if not self.thunder_bank[tier]:
                 logger.info(
