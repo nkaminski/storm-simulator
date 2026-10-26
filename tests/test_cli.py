@@ -12,6 +12,7 @@ def test_cli_defaults():
     assert args.passthrough is None
     assert args.passthrough_universe is None
     assert args.ui is False
+    assert args.small_speakers is False
 
 
 def test_cli_custom_flags():
@@ -22,6 +23,7 @@ def test_cli_custom_flags():
         "--channel-map", "0:1,1:5,2:10,3:15",
         "--passthrough", "0.0.0.0:5568",
         "--passthrough-universe", "1",
+        "--small-speakers",
     ])
     assert args.intensity == 0.9
     assert args.pixels == 8
@@ -29,3 +31,4 @@ def test_cli_custom_flags():
     assert args.channel_map == "0:1,1:5,2:10,3:15"
     assert args.passthrough == "0.0.0.0:5568"
     assert args.passthrough_universe == 1
+    assert args.small_speakers is True
