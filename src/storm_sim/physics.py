@@ -27,6 +27,7 @@ from .constants import (
     MAX_LPF_CUTOFF_HZ,
     MIN_LPF_CUTOFF_HZ,
     MIN_PEAK_BRIGHTNESS,
+    OPTICAL_DISTANCE_EXPONENT,
     OPTICAL_NORM_OFFSET,
     OPTICAL_SOFTENING_DIST_MILES,
     PRIMARY_STROKE_DURATION_RANGE_SEC,
@@ -94,19 +95,21 @@ class PhysicsEngine:
         epicenter = max(0.0, min(1.0, epicenter))
 
         # ----------------------------------------------------------------------
-        # 3. Optical Attenuation: Inverse-Square + Beer-Lambert Extinction
+        # 3. Optical Attenuation: Diffuse Line-Source + Beer-Lambert Extinction
         # ----------------------------------------------------------------------
-        # Combines geometric 1/(d^2 + d_min^2) falloff with exponential atmospheric
-        # extinction: exp(-extinction * d), scaled by current rainfall density.
+        # Combines diffuse geometric 1/(d^p + d_min^p) attenuation (cloud scattering
+        # and extended channel length) with exponential atmospheric extinction:
+        # exp(-extinction * d), scaled by current rainfall density.
         rain_extinction = (
             BASE_OPTICAL_EXTINCTION
             + RAIN_OPTICAL_EXTINCTION_SCALE * state.effective_rain_level
         )
         d_min = OPTICAL_SOFTENING_DIST_MILES
+        p = OPTICAL_DISTANCE_EXPONENT
         raw_intensity = (
-            (d_min**2 + OPTICAL_NORM_OFFSET)
+            (d_min**p + OPTICAL_NORM_OFFSET)
             * math.exp(-rain_extinction * d)
-            / (d**2 + d_min**2)
+            / (d**p + d_min**p)
         )
         peak_brightness = max(MIN_PEAK_BRIGHTNESS, min(1.0, raw_intensity))
 

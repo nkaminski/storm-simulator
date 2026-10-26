@@ -101,20 +101,23 @@ MAX_CONFIGURABLE_PIXELS: int = 5120
 #: Maximum DMX byte value (8-bit brightness: 0 = off, 255 = full white)
 DMX_MAX_VAL: int = 255
 
+#: Exponent modeling diffuse cloud multiple forward scattering and extended line-source attenuation
+OPTICAL_DISTANCE_EXPONENT: float = 1.10
+
 #: Base Beer-Lambert atmospheric optical extinction coefficient (per mile)
-BASE_OPTICAL_EXTINCTION: float = 0.15
+BASE_OPTICAL_EXTINCTION: float = 0.03
 
 #: Additional optical scattering scale factor contributed by rainfall
-RAIN_OPTICAL_EXTINCTION_SCALE: float = 0.35
+RAIN_OPTICAL_EXTINCTION_SCALE: float = 0.05
 
 #: Distance offset parameter (miles) softening singularity for immediate overhead strikes
-OPTICAL_SOFTENING_DIST_MILES: float = 0.12
+OPTICAL_SOFTENING_DIST_MILES: float = 0.45
 
 #: Normalization offset preventing total extinction at close range
-OPTICAL_NORM_OFFSET: float = 0.25
+OPTICAL_NORM_OFFSET: float = 1.40
 
 #: Minimum visible peak brightness floor to preserve distant horizon sheet lightning
-MIN_PEAK_BRIGHTNESS: float = 0.02
+MIN_PEAK_BRIGHTNESS: float = 0.18
 
 #: Minimum Gaussian flash width (sigma, normalized to strip length [0.0 - 1.0])
 BASE_SPATIAL_SIGMA: float = 0.035

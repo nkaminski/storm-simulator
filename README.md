@@ -122,6 +122,55 @@ storm-sim --pixels 4 --channel-map "1:10,2:25,3:50,4:100"
 
 ---
 
+## Recommended Presets & Storm Profiles
+
+The optical engine is tuned to err toward the dramatic aesthetic of being on the open waters of **Lake Michigan** during a Midwest squall, where water reflections and cloud-deck diffusion illuminate the entire horizon.
+
+### 1. Typical / Moderate Illinois Thunderstorm (Default Experience)
+*Realistic prairie summer storm cell passing overhead with rolling thunder and dramatic water/cloud reflections.*
+- **Aesthetic:** Dramatic balance of crisp overhead bolts (saturating localized pixels to full DMX 255), prominent mid-range strikes at 2–3 miles (peaking at ~120–150 DMX), and broad diffuse sheet flashes illuminating the cloud base across all channels.
+- **CLI Command:**
+  ```bash
+  storm-sim --intensity 0.65 --min-dist 0.2 --max-dist 6.0
+  ```
+- **Profile Parameters:**
+  - `intensity`: `0.65` (automatic power-law strike rate \(\approx 14\text{ strikes/min}\), rain volume \(\approx 0.52\))
+  - `min_dist`: `0.2` miles (\(\approx 1,000\text{ ft}\))
+  - `max_dist`: `6.0` miles
+  - **Acoustic / Optical Characteristics:** Beta distribution skews ~60% of strikes between 1.0 and 3.5 miles; return stroke bursts average 2–3 pulses with 30–70 ms gaps; acoustic delays span 1 to 28 seconds.
+
+### 2. Light / Distant Storm (Summer Night Horizon Sheet Lightning)
+*Soft, distant lightning rolls along the horizon with deep subterranean rumbles and zero harsh overhead snaps.*
+- **Aesthetic:** Gentle ambient sheet flashes washing evenly across all 4 channels (DMX 35–50) with broad spatial dispersion (\(\sigma > 0.35\)) and long acoustic propagation delays.
+- **CLI Command:**
+  ```bash
+  storm-sim --intensity 0.25 --min-dist 3.0 --max-dist 15.0 --rate 4.0 --rain 0.20
+  ```
+- **Profile Parameters:**
+  - `intensity`: `0.25`
+  - `min_dist`: `3.0` miles (strikes never occur close to the observer)
+  - `max_dist`: `15.0` miles
+  - `rate`: `4.0` strikes/min (one lazy flash every ~15 seconds)
+  - `rain`: `0.20` (light patter)
+  - **Acoustic / Optical Characteristics:** Severe atmospheric low-pass filtering (\(f_c \approx 130 - 300\text{ Hz}\)) attenuates all high frequencies into warm sub-bass rumbles; acoustic transit delays span 14 to 70 seconds.
+
+### 3. SEVERE Thunderstorm (Lake Michigan Squall / Derecho / Supercell)
+*Violent, relentless convective squall line with deafening overhead claps, torrential rain, and rapid-fire multi-stroke strobing.*
+- **Aesthetic:** Blinding multi-stroke lightning barrages occurring every 1–2 seconds, instantaneous unattenuated acoustic shockwaves (\(<0.25\text{ s}\) delay, \(f_c > 14\text{ kHz}\)), and dense hydrometeor optical extinction from torrential rainfall.
+- **CLI Command:**
+  ```bash
+  storm-sim --intensity 0.95 --min-dist 0.05 --max-dist 3.5 --rate 36.0 --rain 0.95
+  ```
+- **Profile Parameters:**
+  - `intensity`: `0.95`
+  - `min_dist`: `0.05` miles (\(\approx 260\text{ ft}\), immediate overhead lightning)
+  - `max_dist`: `3.5` miles (tight squall core)
+  - `rate`: `36.0` strikes/min (intense barrage)
+  - `rain`: `0.95` (torrential downpour)
+  - **Acoustic / Optical Characteristics:** Up to 5 violent secondary return strokes per flash (`MAX_EXTRA_STROKES_AT_PEAK = 5`) causing rapid optical strobing; heavy rainfall extinction (\(\alpha_{\text{ext}} \approx 0.08/\text{mi}\)); raw full-frequency treble crackle.
+
+---
+
 ## Open Sound Control (OSC) Specification
 
 All simulation parameters can be modified dynamically over UDP OSC:
