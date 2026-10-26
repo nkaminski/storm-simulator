@@ -94,12 +94,12 @@ class ThunderSynthesizer:
                         data = data[:, 0]
                     pk_idx = int(np.argmax(np.abs(data)))
                     start_idx = max(0, pk_idx - int(0.004 * sr))
-                    end_idx = start_idx + int(0.380 * sr)
+                    end_idx = start_idx + int(0.950 * sr)
                     attack = data[start_idx:end_idx].copy().astype(np.float32)
                     if sr != self.sample_rate:
                         num_s = int(len(attack) * self.sample_rate / sr)
                         attack = signal.resample(attack, num_s).astype(np.float32)
-                    fade_len = int(0.070 * self.sample_rate)
+                    fade_len = int(0.280 * self.sample_rate)
                     attack[-fade_len:] *= 0.5 * (
                         1.0 + np.cos(np.linspace(0, np.pi, fade_len, dtype=np.float32))
                     )
@@ -260,17 +260,20 @@ class ThunderSynthesizer:
 
         # ----------------------------------------------------------------------
         # Layer 2: Low-Mid Tortuous Resonance & Channel Echoes (55 - 185 Hz)
+        # Decays gradually across 3.5 - 5.5s to provide continuous audible channel body.
         # ----------------------------------------------------------------------
         white_mid = np.random.normal(0.0, 1.0, n).astype(np.float32)
         sos_mid = signal.butter(
             3, [55.0, 185.0], btype="bandpass", fs=self.sample_rate, output="sos"
         )
         mid_noise = signal.sosfilt(sos_mid, white_mid)
-        mid_env = attack_ramp * np.exp(-t / (sub_decay * 0.70))
-        for _ in range(n_bursts):
-            bt = random.uniform(0.12, dur * 0.55)
-            bw = random.uniform(0.10, 0.38)
-            bamp = random.uniform(0.35, 0.80)
+        mid_decay = 3.6 if tier == "close" else (4.8 if tier == "mid" else 6.5)
+        mid_env = attack_ramp * np.exp(-t / mid_decay)
+        n_mid_bursts = random.randint(6, 10) if tier == "close" else random.randint(8, 12)
+        for _ in range(n_mid_bursts):
+            bt = random.uniform(0.12, dur * 0.65)
+            bw = random.uniform(0.18, 0.48)
+            bamp = random.uniform(0.35, 0.80) * np.exp(-bt / (dur * 0.70))
             mid_env += bamp * np.exp(-((t - bt) ** 2) / (2.0 * (bw**2)))
         mid_layer = mid_noise * mid_env
         mid_layer = mid_layer / max(float(np.max(np.abs(mid_layer))), 1e-6)
@@ -344,9 +347,9 @@ class ThunderSynthesizer:
                     if c_idx in (0, 1, 2)
                     else random.uniform(0.40, 0.75) * np.exp(-(c_idx - 2) / 3.2)
                 )
-                w_bark = random.uniform(0.040, 0.080)
-                w_midc = random.uniform(0.028, 0.058)
-                w_tear = random.uniform(0.016, 0.034)
+                w_bark = random.uniform(0.060, 0.120)
+                w_midc = random.uniform(0.045, 0.085)
+                w_tear = random.uniform(0.035, 0.065)
 
                 env_bark[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.003)) * np.exp(-dt_cp / w_bark)
                 env_midc[mask_c] += c_amp * (1.0 - np.exp(-dt_cp / 0.002)) * np.exp(-dt_cp / w_midc)
@@ -365,6 +368,23 @@ class ThunderSynthesizer:
                 shock_layer[mask_s] += c_amp * (p_direct + p_refl)
 
                 t_clap += random.uniform(0.045, 0.095)
+
+            # Gradual non-infrasonic decay tail:
+            # Low-bark (90-250 Hz), mid-crack (250-700 Hz), and high-tear (700-2400 Hz)
+            # decay smoothly and gradually across 2.0s - 4.5s
+            t_first = 0.08 if tier == "close" else 0.05
+            dt_tail = t - t_first
+            mask_tail = dt_tail >= 0.0
+            dt_tp = dt_tail[mask_tail]
+            decay_bark_const = 2.4 if tier == "close" else 1.8
+            decay_midc_const = 1.7 if tier == "close" else 1.2
+            decay_tear_const = 1.1 if tier == "close" else 0.75
+            tail_bark = (1.0 - np.exp(-dt_tp / 0.040)) * np.exp(-dt_tp / decay_bark_const)
+            tail_midc = (1.0 - np.exp(-dt_tp / 0.030)) * np.exp(-dt_tp / decay_midc_const)
+            tail_tear = (1.0 - np.exp(-dt_tp / 0.020)) * np.exp(-dt_tp / decay_tear_const)
+            env_bark[mask_tail] += 0.65 * tail_bark
+            env_midc[mask_tail] += 0.50 * tail_midc
+            env_tear[mask_tail] += 0.38 * tail_tear
 
             # Shape each band with soft-saturation to match outdoor explosion crest factors (10 - 15)
             sig_bark = np.tanh(
@@ -478,9 +498,11 @@ class ThunderSynthesizer:
         n = len(crack)
         out = crack.copy().astype(np.float64)
         tap_delays = [
-            (0.080, 0.150, 0.38, 1400.0),
-            (0.220, 0.380, 0.25, 850.0),
-            (0.480, 0.780, 0.16, 520.0),
+            (0.075, 0.140, 0.42, 2200.0),
+            (0.160, 0.280, 0.34, 1650.0),
+            (0.320, 0.520, 0.26, 1250.0),
+            (0.580, 0.950, 0.18, 920.0),
+            (1.050, 1.850, 0.12, 680.0),
         ]
         for idx, (d_min, d_max, gain, lpf_hz) in enumerate(tap_delays):
             delay_sec = random.uniform(d_min, d_max)
