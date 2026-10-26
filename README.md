@@ -23,12 +23,12 @@ The mathematical models for optical attenuation, atmospheric extinction, and aco
 
 1. **Beer-Lambert Optical Extinction & Rainfall Scattering:**
    - **Bouguer-Lambert-Beer Law:**
-     - Bouguer, P. (1729). *Essai d'optique sur la gradation de la lumière*.
-     - Lambert, J. H. (1760). *Photometria*.
-     - Beer, A. (1852). *Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten*, [Annalen der Physik und Chemie, 86(5), 78–88](https://doi.org/10.1002/andp.18521620505).
+     - Bouguer, P. (1729). *Essai d'optique sur la gradation de la lumière* [*Optical Essay on the Gradation of Light*]. Claude Jombert, Paris.
+     - Lambert, J. H. (1760). *Photometria, sive de mensura et gradibus luminis, colorum et umbrae* [*Photometry, or On the Measure and Gradations of Light, Colors, and Shadow*]. Klett, Augsburg.
+     - Beer, A. (1852). *Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten* [*Determination of the Absorption of Red Light in Colored Liquids*], [Annalen der Physik und Chemie, 86(5), 78–88](https://doi.org/10.1002/andp.18521620505).
    - **Atmospheric Extinction & Hydrometeor Scattering:**
      - Atlas, D. (1953). *Optical extinction by rainfall*, [Journal of Meteorology, 10(6), 486–488](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
-     - Koschmieder, H. (1924). *Theorie der horizontalen Sichtweite*, Beiträge zur Physik der freien Atmosphäre, 12, 33–53 (Koschmieder's visual extinction law).
+     - Koschmieder, H. (1924). *Theorie der horizontalen Sichtweite* [*Theory of Horizontal Visibility*], Beiträge zur Physik der freien Atmosphäre, 12, 33–53 (Koschmieder's visual extinction law).
      - McCartney, E. J. (1976). *Optics of the Atmosphere: Scattering by Molecules and Particles*. John Wiley & Sons, New York.
 2. **Lightning Optical Radiative Transfer & Multi-Stroke Channel Physics:**
    - Uman, M. A. (1987). *The Lightning Discharge*. Academic Press / Dover Publications.
