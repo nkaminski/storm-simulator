@@ -7,8 +7,9 @@ temporal stroke decay, custom channel mapping (<sim_ch>:<dmx_ch>), and zero-copy
 from __future__ import annotations
 import logging
 import math
+import threading
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import sacn
@@ -30,7 +31,7 @@ class E131LightingEngine:
 
     Manages active lightning flashes, renders temporal envelopes sampled across
     a 1D Gaussian spatial distribution, and outputs sACN packets over UDP unicast
-    (default) or multicast across configurable DMX channels and universes.
+    across configurable DMX channels and universes.
 
     Attributes:
         state: Reference to the shared StormState instance.
@@ -50,22 +51,71 @@ class E131LightingEngine:
         self.state = state
         self.active_strikes: List[StrikeEvent] = []
         self.sender = sacn.sACNsender(fps=state.fps, bind_port=0)
+        self.receiver: Optional[sacn.sACNreceiver] = None
+        self._passthrough_buffers: Dict[int, bytearray] = {}
+        self._passthrough_lock = threading.Lock()
         self.universes: List[int] = []
         self.pixel_coords = np.linspace(0.0, 1.0, state.pixels, dtype=np.float32)
         self.last_frame_dmx: np.ndarray = np.zeros(state.pixels, dtype=np.uint8)
         self._frame_white: np.ndarray = np.zeros(state.pixels, dtype=np.float32)
 
     def start(self) -> None:
-        """Starts the underlying sACN transmitter background thread and universe outputs."""
+        """Starts the underlying sACN transmitter background thread and optional receiver."""
         self.sender.start()
         self._configure_universes(self.state.pixels)
-        target = "Multicast" if self.state.multicast else f"Unicast -> {self.state.e131_host or DEFAULT_E131_HOST}"
+        dest = self.state.e131_host or DEFAULT_E131_HOST
         logger.info(
-            "E1.31 Lighting Engine started: %d pixels across universes %s (%s)",
+            "E1.31 Lighting Engine started: %d pixels across universes %s (Unicast -> %s)",
             self.state.pixels,
             self.universes,
-            target,
+            dest,
         )
+
+        if self.state.passthrough_enabled and self.state.passthrough_host_port:
+            host, port = self.state.passthrough_host_port
+            self.receiver = sacn.sACNreceiver(bind_address=host, bind_port=port)
+            self.receiver.start()
+
+            listen_universes = set(self.universes)
+            if self.state.passthrough_universe is not None:
+                listen_universes.add(self.state.passthrough_universe)
+            elif self.state.start_universe not in listen_universes:
+                listen_universes.add(self.state.start_universe)
+
+            for u in listen_universes:
+                self.receiver.register_listener(
+                    "universe", self._on_sacn_passthrough_data, universe=u
+                )
+
+            logger.info(
+                "sACN Passthrough Mode ENABLED: Listening on %s:%d (universes %s)",
+                host,
+                port,
+                sorted(listen_universes),
+            )
+
+    def _on_sacn_passthrough_data(self, packet: sacn.DataPacket) -> None:
+        """Callback invoked on sACN receiver background thread when desk DMX data arrives."""
+        buf = bytearray(MAX_PIXELS_PER_UNIVERSE)
+        dmx_data = packet.dmxData[:MAX_PIXELS_PER_UNIVERSE]
+        buf[:len(dmx_data)] = dmx_data
+        with self._passthrough_lock:
+            self._passthrough_buffers[packet.universe] = buf
+
+    def _get_passthrough_buffer(self, universe: int) -> bytearray:
+        """Returns a copy of the incoming desk buffer for a given output universe.
+
+        If a custom passthrough_universe is configured, it is mapped to the primary output
+        universe. If no desk data has been received yet, returns a zero-filled buffer.
+        """
+        pt_univ = (
+            self.state.passthrough_universe
+            if (self.state.passthrough_universe is not None and universe == self.state.start_universe)
+            else universe
+        )
+        with self._passthrough_lock:
+            src = self._passthrough_buffers.get(pt_univ)
+            return bytearray(src) if src is not None else bytearray(MAX_PIXELS_PER_UNIVERSE)
 
     def _configure_universes(self, pixel_count: int) -> None:
         """Dynamically configures or reallocates sACN universes to match pixel count and channel map.
@@ -93,13 +143,8 @@ class E131LightingEngine:
 
         for univ in self.universes:
             self.sender.activate_output(univ)
-            if not self.state.multicast:
-                # Unicast mode (default)
-                self.sender[univ].destination = self.state.e131_host or DEFAULT_E131_HOST
-                self.sender[univ].multicast = False
-            else:
-                # Multicast mode
-                self.sender[univ].multicast = True
+            self.sender[univ].destination = self.state.e131_host or DEFAULT_E131_HOST
+            self.sender[univ].multicast = False
 
         self.pixel_coords = np.linspace(0.0, 1.0, pixel_count, dtype=np.float32)
         self.last_frame_dmx = np.zeros(pixel_count, dtype=np.uint8)
@@ -124,12 +169,13 @@ class E131LightingEngine:
             self.active_strikes.append(strike)
 
     def clear_all(self) -> None:
-        """Immediately extinguishes all active lightning flashes and zeros DMX output."""
+        """Immediately extinguishes all active lightning flashes and clears lightning DMX output."""
         self.active_strikes.clear()
         self.last_frame_dmx.fill(0)
         self._frame_white.fill(0.0)
-        for univ in self.universes:
-            self.sender[univ].dmx_data = ()
+        if not self.state.passthrough_enabled:
+            for univ in self.universes:
+                self.sender[univ].dmx_data = ()
 
     def render_frame(self, now: float) -> None:
         """Renders one animation frame of DMX brightness values and sends via sACN.
@@ -138,6 +184,9 @@ class E131LightingEngine:
         stroke pulse, sums spatial contributions into a preallocated float32 buffer,
         clips to [0, 255], and transmits raw bytes to sACN universes using either
         sequential packing or the custom channel map.
+
+        In sACN passthrough mode, incoming desk DMX frames are passed through intact,
+        and only channels with nonzero lightning output (> 0) override the desk.
 
         Args:
             now: Current monotonic timestamp in seconds.
@@ -148,69 +197,95 @@ class E131LightingEngine:
         if self.state.is_zero_intensity:
             if self.active_strikes:
                 self.clear_all()
-            return
+            if not self.state.passthrough_enabled:
+                return
+            dmx_bytes = np.zeros(self.state.pixels, dtype=np.uint8)
+            self.last_frame_dmx = dmx_bytes
+        else:
+            self._frame_white.fill(0.0)
+            remaining_strikes: List[StrikeEvent] = []
+
+            for strike in self.active_strikes:
+                elapsed = now - strike.timestamp
+                total_duration = (
+                    strike.strokes[-1].offset_sec
+                    + strike.strokes[-1].duration_sec
+                    + STRIKE_ENVELOPE_TAIL_PAD_SEC
+                )
+                if elapsed > total_duration:
+                    continue
+                remaining_strikes.append(strike)
+
+                temporal_amp = 0.0
+                for stroke in strike.strokes:
+                    dt = elapsed - stroke.offset_sec
+                    if 0.0 <= dt <= stroke.duration_sec:
+                        decay_rate = STROKE_DECAY_TIME_CONSTANT / stroke.duration_sec
+                        stroke_env = stroke.peak_amplitude * math.exp(-decay_rate * dt)
+                        temporal_amp = max(temporal_amp, stroke_env)
+
+                if temporal_amp <= 0.001:
+                    continue
+
+                # Fast hot-path vector multiply-add using precomputed spatial profile
+                amp_scalar = (
+                    temporal_amp
+                    * strike.peak_brightness
+                    * self.state.master_brightness
+                    * DMX_MAX_VAL
+                )
+                self._frame_white += strike.spatial_profile * amp_scalar
+
+            self.active_strikes = remaining_strikes
+            dmx_bytes = np.clip(self._frame_white, 0, DMX_MAX_VAL).astype(np.uint8)
+            self.last_frame_dmx = dmx_bytes
 
         num_pixels = self.state.pixels
-        self._frame_white.fill(0.0)
-        remaining_strikes: List[StrikeEvent] = []
-
-        for strike in self.active_strikes:
-            elapsed = now - strike.timestamp
-            total_duration = (
-                strike.strokes[-1].offset_sec
-                + strike.strokes[-1].duration_sec
-                + STRIKE_ENVELOPE_TAIL_PAD_SEC
-            )
-            if elapsed > total_duration:
-                continue
-            remaining_strikes.append(strike)
-
-            temporal_amp = 0.0
-            for stroke in strike.strokes:
-                dt = elapsed - stroke.offset_sec
-                if 0.0 <= dt <= stroke.duration_sec:
-                    decay_rate = STROKE_DECAY_TIME_CONSTANT / stroke.duration_sec
-                    stroke_env = stroke.peak_amplitude * math.exp(-decay_rate * dt)
-                    temporal_amp = max(temporal_amp, stroke_env)
-
-            if temporal_amp <= 0.001:
-                continue
-
-            # Fast hot-path vector multiply-add using precomputed spatial profile
-            amp_scalar = (
-                temporal_amp
-                * strike.peak_brightness
-                * self.state.master_brightness
-                * DMX_MAX_VAL
-            )
-            self._frame_white += strike.spatial_profile * amp_scalar
-
-        self.active_strikes = remaining_strikes
-
-        dmx_bytes = np.clip(self._frame_white, 0, DMX_MAX_VAL).astype(np.uint8)
-        self.last_frame_dmx = dmx_bytes
 
         # Output transmission: custom channel mapping or sequential packing
         if self.state.channel_map:
             univ_buffers: Dict[int, bytearray] = {
-                u: bytearray(MAX_PIXELS_PER_UNIVERSE) for u in self.universes
+                u: (
+                    self._get_passthrough_buffer(u)
+                    if self.state.passthrough_enabled
+                    else bytearray(MAX_PIXELS_PER_UNIVERSE)
+                )
+                for u in self.universes
             }
             for sim_idx, dmx_offset in self.state.channel_map.items():
                 if sim_idx < len(dmx_bytes):
+                    val = dmx_bytes[sim_idx]
                     univ = self.state.start_universe + (dmx_offset // MAX_PIXELS_PER_UNIVERSE)
                     slot = dmx_offset % MAX_PIXELS_PER_UNIVERSE
                     if univ in univ_buffers and slot < MAX_PIXELS_PER_UNIVERSE:
-                        univ_buffers[univ][slot] = dmx_bytes[sim_idx]
+                        # In passthrough mode, only override when lightning channel is nonzero (> 0)
+                        if not self.state.passthrough_enabled or val > 0:
+                            univ_buffers[univ][slot] = val
             for univ in self.universes:
                 self.sender[univ].dmx_data = bytes(univ_buffers[univ])
         else:
             for idx, univ in enumerate(self.universes):
                 start_px = idx * MAX_PIXELS_PER_UNIVERSE
                 end_px = min(num_pixels, (idx + 1) * MAX_PIXELS_PER_UNIVERSE)
-                self.sender[univ].dmx_data = dmx_bytes[start_px:end_px].tobytes()
+                px_slice = dmx_bytes[start_px:end_px]
+                if self.state.passthrough_enabled:
+                    buf = self._get_passthrough_buffer(univ)
+                    for p_idx, val in enumerate(px_slice):
+                        # In passthrough mode, only override when lightning channel is nonzero (> 0)
+                        if val > 0:
+                            buf[p_idx] = val
+                    self.sender[univ].dmx_data = bytes(buf)
+                else:
+                    self.sender[univ].dmx_data = px_slice.tobytes()
 
     def stop(self) -> None:
-        """Cleanly stops the sACN sender thread and clears outputs."""
+        """Cleanly stops the sACN sender and optional receiver threads and clears outputs."""
         self.clear_all()
         time.sleep(0.05)
+        if self.receiver is not None:
+            try:
+                self.receiver.stop()
+            except Exception as err:
+                logger.debug("Error stopping sACN receiver: %s", err)
+            self.receiver = None
         self.sender.stop()

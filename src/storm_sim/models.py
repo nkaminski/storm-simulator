@@ -20,7 +20,8 @@ from .constants import (
     DEFAULT_MAX_DIST_MILES,
     DEFAULT_MAX_RATE_PER_MIN,
     DEFAULT_MIN_DIST_MILES,
-    DEFAULT_MULTICAST,
+    DEFAULT_PASSTHROUGH_BIND,
+    DEFAULT_PASSTHROUGH_PORT,
     DEFAULT_PIXELS,
     DEFAULT_START_UNIVERSE,
     INTENSITY_RATE_EXPONENT,
@@ -90,8 +91,7 @@ class StormState:
 
     Attributes:
         pixels: Total count of 1-channel monochrome white pixels in the active array.
-        e131_host: Optional IP address for unicast E1.31 sACN packets (None = multicast).
-        multicast: Flag forcing E1.31 multicast operation.
+        e131_host: IP address for unicast E1.31 sACN packets.
         start_universe: The first E1.31 DMX universe index (typically 1).
         fps: Target frame rate for the lighting rendering loop.
         intensity: Current master storm intensity [0.0 = off / killswitch, 1.0 = maximum].
@@ -111,10 +111,11 @@ class StormState:
 
     pixels: int = DEFAULT_PIXELS
     e131_host: str = DEFAULT_E131_HOST
-    multicast: bool = DEFAULT_MULTICAST
     start_universe: int = DEFAULT_START_UNIVERSE
     fps: int = DEFAULT_FPS
     channel_map: Optional[Dict[int, int]] = None
+    passthrough_listen: Optional[str] = None
+    passthrough_universe: Optional[int] = None
 
     intensity: float = DEFAULT_INTENSITY
     min_dist_miles: float = DEFAULT_MIN_DIST_MILES
@@ -142,6 +143,19 @@ class StormState:
         all in-transit thunder sound waves, and clears all DMX pixel outputs.
         """
         return self.intensity <= ZERO_INTENSITY_EPSILON
+
+    @property
+    def passthrough_enabled(self) -> bool:
+        """Indicates whether optional sACN passthrough mode is enabled."""
+        return self.passthrough_listen is not None and bool(self.passthrough_listen.strip())
+
+    @property
+    def passthrough_host_port(self) -> Optional[Tuple[str, int]]:
+        """Parses and returns the configured (host, port) tuple for sACN passthrough, or None."""
+        if not self.passthrough_enabled:
+            return None
+        assert self.passthrough_listen is not None
+        return parse_address_port(self.passthrough_listen)
 
     def update_ramp(self, now: float) -> None:
         """Smoothly interpolates storm intensity over time if a ramp is active.
@@ -259,3 +273,63 @@ def parse_channel_map(
         channel_map[sim_idx] = dmx_offset
 
     return channel_map
+
+
+def parse_address_port(
+    addr_str: str,
+    default_host: str = DEFAULT_PASSTHROUGH_BIND,
+    default_port: int = DEFAULT_PASSTHROUGH_PORT,
+) -> Tuple[str, int]:
+    """Parses a network socket string in 'address:port' notation into a (host, port) tuple.
+
+    Supports notation formats:
+        '0.0.0.0:5568'      -> ('0.0.0.0', 5568)
+        '127.0.0.1:5569'    -> ('127.0.0.1', 5569)
+        '192.168.1.50:5568' -> ('192.168.1.50', 5568)
+        ':5568'             -> ('0.0.0.0', 5568)
+        '5568'              -> ('0.0.0.0', 5568)
+        '[::1]:5568'        -> ('::1', 5568)
+
+    Args:
+        addr_str: String formatted in address:port notation.
+        default_host: Fallback bind address if only port is provided.
+        default_port: Fallback port if omitted.
+
+    Returns:
+        Tuple of (host_string, port_integer).
+
+    Raises:
+        ValueError: If the string is empty, malformed, or port is outside [1, 65535].
+    """
+    if not addr_str or not isinstance(addr_str, str):
+        raise ValueError("Address must be a non-empty string in address:port notation.")
+
+    s = addr_str.strip()
+    if not s:
+        raise ValueError("Address string cannot be empty.")
+
+    if s.startswith("[") and "]:" in s:
+        # IPv6 bracket notation, e.g. [::1]:5568
+        host, port_str = s[1:].split("]:", 1)
+    elif ":" in s:
+        host, port_str = s.rsplit(":", 1)
+        if not host:
+            host = default_host
+    else:
+        # User provided only a port number, e.g. "5568"
+        host = default_host
+        port_str = s
+
+    try:
+        port = int(port_str.strip())
+    except ValueError:
+        raise ValueError(
+            f"Invalid non-integer port in address '{addr_str}'. Expected address:port notation."
+        ) from None
+
+    if not (1 <= port <= 65535):
+        raise ValueError(
+            f"Port number {port} is out of valid range (1 - 65535) in address '{addr_str}'."
+        )
+
+    return host.strip(), port

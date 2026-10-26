@@ -43,8 +43,11 @@ DEFAULT_ASSETS_DIR: str = "./assets"
 #: Default target IP address for E1.31 sACN unicast transmission
 DEFAULT_E131_HOST: str = "127.0.0.1"
 
-#: Default E1.31 transmission mode (False = unicast by default, True = multicast)
-DEFAULT_MULTICAST: bool = False
+#: Default network interface bind address for optional sACN passthrough input
+DEFAULT_PASSTHROUGH_BIND: str = "0.0.0.0"
+
+#: Standard E1.31 UDP port for sACN transmission and reception
+DEFAULT_PASSTHROUGH_PORT: int = 5568
 
 #: Default network interface bind address for OSC UDP server
 DEFAULT_OSC_HOST: str = "0.0.0.0"

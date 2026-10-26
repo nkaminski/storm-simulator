@@ -1,6 +1,6 @@
 """cli.py - Command-line interface and entry point for storm-sim.
 
-Provides argparse CLI options for simulator operation, E1.31 sACN unicast/multicast
+Provides argparse CLI options for simulator operation, E1.31 sACN unicast
 network configuration, channel mapping, meteorological parameter controls, and GUI test bench launching.
 """
 
@@ -21,7 +21,6 @@ from .constants import (
     DEFAULT_MASTER_VOLUME,
     DEFAULT_MAX_DIST_MILES,
     DEFAULT_MIN_DIST_MILES,
-    DEFAULT_MULTICAST,
     DEFAULT_OSC_HOST,
     DEFAULT_OSC_PORT,
     DEFAULT_PIXELS,
@@ -29,7 +28,7 @@ from .constants import (
     MIN_DIST_SPAN_MILES,
 )
 from .engine import StormCoordinator
-from .models import StormState, parse_channel_map
+from .models import StormState, parse_address_port, parse_channel_map
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
@@ -65,12 +64,6 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         help=f"Target IP for E1.31 unicast transmission (default: {DEFAULT_E131_HOST})",
     )
     parser.add_argument(
-        "--multicast",
-        action="store_true",
-        default=DEFAULT_MULTICAST,
-        help="Enable E1.31 multicast mode (default: unicast)",
-    )
-    parser.add_argument(
         "--channel-map",
         type=str,
         default=None,
@@ -82,6 +75,24 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_START_UNIVERSE,
         help=f"Starting E1.31 DMX universe (default: {DEFAULT_START_UNIVERSE})",
+    )
+    parser.add_argument(
+        "--passthrough",
+        "--passthrough-listen",
+        dest="passthrough",
+        type=str,
+        default=None,
+        metavar="ADDRESS:PORT",
+        help="Optional sACN passthrough listen address and port in 'address:port' notation "
+        "(e.g. '0.0.0.0:5568' or '127.0.0.1:5569'). Receives a full DMX universe from an external desk "
+        "and overrides only nonzero lightning channels.",
+    )
+    parser.add_argument(
+        "--passthrough-universe",
+        type=int,
+        default=None,
+        metavar="UNIV",
+        help="Optional sACN universe to listen on for passthrough input (default: matches --universe)",
     )
     parser.add_argument(
         "--min-dist",
@@ -142,7 +153,13 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Launch the desktop hardware visualizer and control UI",
     )
-    return parser.parse_args(args)
+    parsed = parser.parse_args(args)
+    if parsed.passthrough:
+        try:
+            parse_address_port(parsed.passthrough)
+        except ValueError as err:
+            parser.error(f"Invalid --passthrough argument: {err}")
+    return parsed
 
 
 def main(args: Optional[List[str]] = None) -> None:
@@ -161,8 +178,9 @@ def main(args: Optional[List[str]] = None) -> None:
     state = StormState(
         pixels=parsed.pixels,
         e131_host=parsed.e131_host,
-        multicast=parsed.multicast,
         start_universe=parsed.universe,
+        passthrough_listen=parsed.passthrough,
+        passthrough_universe=parsed.passthrough_universe,
         intensity=max(0.0, min(1.0, parsed.intensity)),
         min_dist_miles=min_d,
         max_dist_miles=max_d,

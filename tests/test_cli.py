@@ -7,9 +7,10 @@ def test_cli_defaults():
     args = parse_args([])
     assert args.intensity == 0.5
     assert args.pixels == 4
-    assert args.multicast is False
     assert args.e131_host == "127.0.0.1"
     assert args.channel_map is None
+    assert args.passthrough is None
+    assert args.passthrough_universe is None
     assert args.ui is False
 
 
@@ -19,10 +20,12 @@ def test_cli_custom_flags():
         "--pixels", "8",
         "--e131-host", "192.168.1.50",
         "--channel-map", "0:1,1:5,2:10,3:15",
-        "--multicast",
+        "--passthrough", "0.0.0.0:5568",
+        "--passthrough-universe", "1",
     ])
     assert args.intensity == 0.9
     assert args.pixels == 8
     assert args.e131_host == "192.168.1.50"
     assert args.channel_map == "0:1,1:5,2:10,3:15"
-    assert args.multicast is True
+    assert args.passthrough == "0.0.0.0:5568"
+    assert args.passthrough_universe == 1

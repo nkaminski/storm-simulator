@@ -2,14 +2,19 @@
 
 import pytest
 
-from storm_sim.models import StormState, StrikeEvent, StrokePulse, parse_channel_map
+from storm_sim.models import (
+    StormState,
+    StrikeEvent,
+    StrokePulse,
+    parse_address_port,
+    parse_channel_map,
+)
 
 
 def test_storm_state_defaults():
     state = StormState()
     assert state.pixels == 4
     assert state.e131_host == "127.0.0.1"
-    assert state.multicast is False
     assert state.intensity == 0.5
     assert state.fps == 44
     assert state.running is True
@@ -74,3 +79,23 @@ def test_parse_channel_map_invalid_format():
 def test_parse_channel_map_out_of_bounds():
     with pytest.raises(ValueError, match="out of bounds"):
         parse_channel_map("0:1, 4:2", pixel_count=4)
+
+
+def test_parse_address_port_valid():
+    assert parse_address_port("0.0.0.0:5568") == ("0.0.0.0", 5568)
+    assert parse_address_port("127.0.0.1:5569") == ("127.0.0.1", 5569)
+    assert parse_address_port("192.168.1.50:6454") == ("192.168.1.50", 6454)
+    assert parse_address_port(":5568") == ("0.0.0.0", 5568)
+    assert parse_address_port("5568") == ("0.0.0.0", 5568)
+    assert parse_address_port("[::1]:5568") == ("::1", 5568)
+
+
+def test_parse_address_port_invalid():
+    with pytest.raises(ValueError, match="non-empty"):
+        parse_address_port("")
+    with pytest.raises(ValueError, match="non-integer"):
+        parse_address_port("0.0.0.0:abc")
+    with pytest.raises(ValueError, match="out of valid range"):
+        parse_address_port("0.0.0.0:99999")
+    with pytest.raises(ValueError, match="out of valid range"):
+        parse_address_port("0.0.0.0:0")

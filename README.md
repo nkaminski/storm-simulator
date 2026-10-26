@@ -6,7 +6,8 @@ Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator wi
 
 ## Features
 
-- **E1.31 sACN Lighting Output with Channel Mapping:** Defaults to 4 pixels over standard unicast (or multicast), with flexible `<sim_ch>:<e131_ch>` channel mapping supporting multi-universe configurations.
+- **E1.31 sACN Lighting Output with Channel Mapping:** Defaults to 4 pixels over standard unicast, with flexible `<sim_ch>:<e131_ch>` channel mapping supporting multi-universe configurations.
+- **sACN Passthrough Mode with Nonzero Override:** Feed a full DMX universe from an external lighting desk through the simulator. Desk channels pass through untouched, and only channels with nonzero lightning output override the desk (remapping never shifts or alters passthrough channels).
 - **Physical Optical Attenuation:** Inverse-square geometric spreading combined with Beer-Lambert atmospheric scattering and rain extinction (see [Scientific Citations & Model References](#scientific-citations--model-references)).
 - **Spatial Multi-Stroke Lightning:** Microsecond return stroke envelopes and distance-scaled Gaussian spread across the simulated lightning channels.
 - **Real-Time Acoustic DSP:** Speed-of-sound propagation delay (\(\approx 4.69\text{ s/mi}\)), atmospheric low-pass filtering (scipy Butterworth), and constant-power stereo panning matching lighting epicenters.
@@ -90,8 +91,9 @@ storm-sim-ui
 |---|---|---|---|
 | `-i`, `--intensity` | float | `0.5` | Master storm intensity (`0.0` = off, `1.0` = max) |
 | `--pixels` | int | `4` | Number of simulated lightning channels (default: `4`) |
-| `--e131-host` | str | `127.0.0.1` | Target IP for E1.31 unicast transmission (default: unicast) |
-| `--multicast` | flag | `False` | Enable E1.31 multicast mode (default: unicast) |
+| `--e131-host` | str | `127.0.0.1` | Target IP for E1.31 unicast transmission |
+| `--passthrough` | str | `None` | Optional sACN passthrough listen address and port (`address:port`, e.g. `0.0.0.0:5568`) |
+| `--passthrough-universe` | int | `None` | Optional input universe to listen on for passthrough (default: matches `--universe`) |
 | `--channel-map` | str | `None` | Custom channel map: `<sim_ch>:<e131_ch>,...` (e.g. `0:1,1:2,2:3,3:4`) |
 | `--universe` | int | `1` | Starting E1.31 DMX universe |
 | `--min-dist` | float | `0.1` | Minimum strike distance (miles) |
@@ -118,6 +120,26 @@ storm-sim --pixels 4 --channel-map "0:10,1:25,2:50,3:100"
 
 # 1-based simulator channel indexing is also supported:
 storm-sim --pixels 4 --channel-map "1:10,2:25,3:50,4:100"
+```
+
+### sACN Passthrough Mode Examples
+
+When `--passthrough <address:port>` is supplied, `storm-sim` listens for an incoming full DMX universe from an external lighting effects console or software desk:
+- **Passthrough Preservation:** All 512 channels from the desk pass straight through 1:1 to the output fixtures without alterations.
+- **Conditional Nonzero Override:** When a lightning flash occurs, only the specific channels mapped to active lightning fixtures are overridden, and only when their DMX value is strictly greater than 0 (`> 0`). When lightning channels decay back to 0, control of those channels immediately reverts back to the desk.
+- **Remapping Independence:** Lightning channel remapping (`--channel-map`) only routes simulator pixels to their destination slots; it **never** alters, shifts, or remaps the passthrough desk channels.
+
+```bash
+# Listen on standard sACN port 5568 across all network interfaces:
+storm-sim --passthrough 0.0.0.0:5568 --e131-host 192.168.1.100
+
+# Listen on custom port with remapped lightning channels:
+# (Desk channels 10, 25, 50, 100 are overridden only during active lightning;
+# all other 508 channels pass through untouched directly from the desk)
+storm-sim --passthrough 0.0.0.0:5568 --channel-map "0:10,1:25,2:50,3:100" --e131-host 192.168.1.100
+
+# Feed desk universe 2 into simulator output universe 1:
+storm-sim --passthrough 0.0.0.0:5568 --passthrough-universe 2 --universe 1
 ```
 
 ---
