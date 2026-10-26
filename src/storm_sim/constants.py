@@ -128,21 +128,36 @@ BASE_SPATIAL_SIGMA: float = 0.035
 #: Increase in Gaussian flash width per mile of distance (distant strikes wash wide)
 SPATIAL_SIGMA_PER_MILE: float = 0.065
 
-#: Minimum duration a stroke is held in full ON state (1/15th sec ~66.7 ms) to ensure
-#: physical lighting fixtures, dimmers, and LED drivers have adequate response time to strike.
-MIN_STROKE_ON_TIME_SEC: float = 1.0 / 15.0
+#: Standard AC line mains frequency in North America (60 Hz)
+AC_MAINS_FREQ_HZ: float = 60.0
+
+#: Duration of one full 60 Hz AC line cycle (~16.67 ms)
+AC_CYCLE_SEC: float = 1.0 / AC_MAINS_FREQ_HZ
+
+#: Duration of one 60 Hz AC half-cycle between line zero crossings (~8.33 ms)
+AC_HALF_CYCLE_SEC: float = AC_CYCLE_SEC / 2.0
+
+#: Number of 60 Hz AC cycles required for AC LED lights to charge internal power supplies
+#: and reach full forward conduction (2 cycles warm-up + 2 cycles sustained emission = 4 cycles = 1/15 s)
+AC_LED_MIN_STRIKE_CYCLES: int = 4
+
+#: Minimum duration a stroke is held in full ON state (1/15th sec ~66.7 ms = 4 AC line cycles) to ensure
+#: AC LED drivers and phase-cut dimmers have adequate response time to strike and illuminate.
+MIN_STROKE_ON_TIME_SEC: float = AC_LED_MIN_STRIKE_CYCLES * AC_CYCLE_SEC
 
 #: Range of durations (seconds) for primary return stroke pulse (on-time plateau + exponential decay)
-PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.12, 0.24)
+PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.13, 0.25)
 
 #: Range of durations (seconds) for secondary stepped return strokes (on-time plateau + exponential decay)
-SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.09, 0.16)
+SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.10, 0.17)
 
 #: Amplitude range for secondary return strokes relative to primary stroke (1.0)
 SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.35, 0.85)
 
-#: Time interval (seconds) between successive return strokes in a single strike
-INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (0.035, 0.080)
+#: Time interval (seconds) between successive return strokes in a single strike.
+#: Tuned to 3 - 6 full 60 Hz AC cycles (50 ms - 100 ms) so AC phase dimmers can commutate
+#: off at zero crossings and LED driver capacitors can fully discharge before re-striking.
+INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (3.0 * AC_CYCLE_SEC, 6.0 * AC_CYCLE_SEC)
 
 #: Exponential decay constant for return stroke luminous envelope: exp(-k * dt / dur)
 STROKE_DECAY_TIME_CONSTANT: float = 4.5

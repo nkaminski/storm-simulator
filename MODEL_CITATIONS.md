@@ -50,17 +50,23 @@ where:
 - $\alpha_{\text{ext}} = \alpha_0 + \alpha_{\text{rain}} \cdot R$ is the hydrometeor-dependent extinction coefficient (`BASE_OPTICAL_EXTINCTION`, `RAIN_OPTICAL_EXTINCTION_SCALE`),
 - Clamped to a visibility floor $I_{\text{min}} = 0.18$ (`MIN_PEAK_BRIGHTNESS`) to preserve distant horizon sheet lightning.
 
-### Temporal Optical Envelope & Fixture Response Dynamics
+### Temporal Optical Envelope & AC LED Electrical Dynamics
 While return stroke channel breakdown occurs in microseconds, channel continuing currents (30–50% of cloud-to-ground discharges; Uman 1987) and multiple cloud scattering (Thomason & Krider 1982) stretch visible illumination across 50–250 ms.
 
-Physical lighting fixtures (theatrical dimmers, moving fixtures, and LED drivers) have electrical inertia (driver capacitance, smoothing filters, and DMX frame integration windows). Pulses shorter than $1/15\text{ s}$ ($\sim 66.7\text{ ms}$, approx 3 DMX packets at 44 Hz) fail to strike or achieve significant output. The temporal envelope enforces a sustained plateau:
+#### 60 Hz AC LED Driver Physics & Zero-Crossing Commutation
+Real-world theatrical and architectural installations predominantly drive AC LED luminaires via phase-cut (forward/reverse phase) dimmers or solid-state relays:
+1. **Capacitor Charge & Forward Conduction Delay:** AC LED drivers contain bridge rectifiers and internal filter/reservoir capacitors. When an instantaneous DMX firing pulse arrives, the driver requires **$2\text{ full }60\text{ Hz AC cycles}$ ($33.3\text{ ms}$)** for the DC bus to charge and cross the LED diode array forward conduction threshold ($V_f$) before visible light is produced.
+2. **Sustained Emission Plateau:** To deliver meaningful illumination after the 2-cycle turn-on lag, the control signal must sustain full output for an additional **$2\text{ full AC cycles}$ ($33.3\text{ ms}$)**. Consequently, the minimum fixture on-time is derived from fundamental AC line physics:
+   $$t_{\text{on\_min}} = \frac{4\text{ cycles}}{60\text{ Hz}} = \frac{1}{15}\text{ s} \approx 66.67\text{ ms}\quad\text{(`MIN_STROKE_ON_TIME_SEC`)}$$
+3. **Zero-Crossing Commutation & Multi-Stroke Inter-Stroke Clearance:** Standard TRIAC and thyristor phase dimmers cannot commutate off mid-cycle; current only ceases when the line voltage passes through the AC **zero crossing** ($T_{\text{half}} = 1/120\text{ s} \approx 8.33\text{ ms}$). Driver smoothing capacitors sustain light output across an additional $1–2$ half-cycles. To prevent consecutive multi-stroke pulses from blurring into a single continuous smear, the inter-stroke gap is calibrated to **$3\text{ to }6\text{ AC cycles}$ ($50–100\text{ ms}$; `INTER_STROKE_GAP_RANGE_SEC`)**, guaranteeing complete optical extinction across zero crossings prior to subsequent stroke restrikes.
 
+The temporal envelope enforces this physical progression:
 $$A(t) = \begin{cases} A_{\text{peak}} & \text{if } 0 \le t \le t_{\text{on}} \\ A_{\text{peak}} \cdot \exp\left(-\frac{k (t - t_{\text{on}})}{t_{\text{dur}} - t_{\text{on}}}\right) & \text{if } t > t_{\text{on}} \end{cases}$$
 
 where:
-- $t_{\text{on}} \ge 1/15\text{ s}$ (`MIN_STROKE_ON_TIME_SEC`),
+- $t_{\text{on}} \ge 1/15\text{ s} = 4 / 60\text{ s}$ (`MIN_STROKE_ON_TIME_SEC`),
 - $k = 4.5$ (`STROKE_DECAY_TIME_CONSTANT`),
-- $t_{\text{dur}}$ is the total stroke duration (`PRIMARY_STROKE_DURATION_RANGE_SEC`, `SECONDARY_STROKE_DURATION_RANGE_SEC`).
+- $t_{\text{dur}}$ is total stroke duration (`PRIMARY_STROKE_DURATION_RANGE_SEC`, `SECONDARY_STROKE_DURATION_RANGE_SEC`).
 
 ---
 
