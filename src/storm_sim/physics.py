@@ -14,7 +14,7 @@ from typing import List, Optional
 
 from .constants import (
     ABSOLUTE_MIN_DIST_MILES,
-    ACOUSTIC_AIR_ABSORPTION_DB_PER_MILE,
+    ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR,
     ACOUSTIC_REF_DIST_MILES,
     BASE_OPTICAL_EXTINCTION,
     BASE_SPATIAL_SIGMA,
@@ -147,14 +147,16 @@ class PhysicsEngine:
         # 6. Acoustic Propagation Delay, Attenuation, and Atmospheric LPF
         # ----------------------------------------------------------------------
         # Delay: Speed of sound (~4.69 sec/mile).
-        # Gain: 20*log10(d_ref / d) spherical spreading loss + 2.8 dB/mile air absorption.
-        # LPF: High frequencies (>6 kHz) are absorbed over distance, leaving sub-bass rumbles.
+        # Geometric Attenuation: Line-source cylindrical wave expansion (-11 dB per decade)
+        # reflecting the multi-kilometer vertical/horizontal lightning channel.
+        # LPF: High frequencies are absorbed over distance, leaving deep sub-bass rumbles.
         audio_delay = d / SPEED_OF_SOUND_MILES_PER_SEC
-        gain_db = -20.0 * math.log10(
-            max(d, ACOUSTIC_REF_DIST_MILES) / ACOUSTIC_REF_DIST_MILES
-        ) - (ACOUSTIC_AIR_ABSORPTION_DB_PER_MILE * d)
-        gain_db += INTENSITY_ACOUSTIC_BOOST_DB * state.intensity
-        audio_gain = min(1.0, math.pow(10.0, gain_db / 20.0))
+        eff_d = max(ACOUSTIC_REF_DIST_MILES, d)
+        loss_db = -ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR * math.log10(
+            eff_d / ACOUSTIC_REF_DIST_MILES
+        )
+        gain_db = loss_db + (INTENSITY_ACOUSTIC_BOOST_DB * state.intensity)
+        audio_gain = max(0.05, min(1.0, math.pow(10.0, gain_db / 20.0)))
 
         lpf_hz = max(
             MIN_LPF_CUTOFF_HZ,

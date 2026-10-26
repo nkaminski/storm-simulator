@@ -160,26 +160,26 @@ AUDIO_SAMPLE_RATE: int = 44100
 #: Low-latency callback buffer block size in sample frames
 AUDIO_BLOCK_SIZE: int = 1024
 
-#: Reference distance (miles) for inverse-distance spherical acoustic attenuation
-ACOUSTIC_REF_DIST_MILES: float = 0.15
+#: Reference distance (miles) for line-source cylindrical acoustic attenuation
+ACOUSTIC_REF_DIST_MILES: float = 0.25
 
-#: Atmospheric molecular absorption attenuation rate in dB per mile
-ACOUSTIC_AIR_ABSORPTION_DB_PER_MILE: float = 2.8
+#: Cylindrical line-source spreading loss coefficient (dB per decade of distance)
+ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR: float = 11.0
 
 #: Acoustic boost applied at full storm intensity in dB
 INTENSITY_ACOUSTIC_BOOST_DB: float = 3.0
 
 #: Floor cutoff frequency for atmospheric low-pass filter (sub-bass rumbles)
-MIN_LPF_CUTOFF_HZ: float = 130.0
+MIN_LPF_CUTOFF_HZ: float = 110.0
 
 #: Ceiling cutoff frequency for atmospheric low-pass filter (close snaps)
-MAX_LPF_CUTOFF_HZ: float = 16000.0
+MAX_LPF_CUTOFF_HZ: float = 14000.0
 
 #: Reference numerator for distance-dependent low-pass filter cutoff calculation
-LPF_REFERENCE_NUMERATOR_HZ: float = 12000.0
+LPF_REFERENCE_NUMERATOR_HZ: float = 8000.0
 
 #: High-frequency roll-off factor per mile of distance
-LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.85
+LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.40
 
 #: IIR Butterworth low-pass filter order (12 dB/octave attenuation)
 BUTTERWORTH_FILTER_ORDER: int = 2
