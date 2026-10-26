@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "storm-sim"
+version = "0.1.0"
+description = "Physics-accurate E1.31 (Monochrome White) lighting and spatial audio thunderstorm simulator"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "sounddevice>=0.4.6",
+    "soundfile>=0.12.1",
+    "sacn>=1.9.0",
+    "python-osc>=1.8.3",
+]
+
+[project.optional-dependencies]
+ui = [
+    "customtkinter>=5.2.0; platform_system != 'Linux'",
+]
+test = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+storm-sim = "storm_sim.cli:main"
+storm-synth = "storm_sim.synthesis:main"
+
+[project.gui-scripts]
+storm-sim-ui = "storm_sim.ui:run_ui_app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
