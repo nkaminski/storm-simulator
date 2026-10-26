@@ -106,6 +106,7 @@ storm-sim-ui
 | `--osc-host` | str | `0.0.0.0` | OSC listen bind address |
 | `--osc-port` | int | `5005` | OSC UDP port |
 | `--ui` | flag | `False` | Launch native desktop hardware visualizer UI |
+| `--small-speakers` | flag | `False` | Elevate infrasonics (48-140 Hz with saturation) for compact monitors lacking subwoofers |
 
 ### Channel Mapping Examples
 
