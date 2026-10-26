@@ -1,17 +1,22 @@
-"""test_models.py - Simple tests for StormState and dataclasses."""
+"""test_models.py - Simple tests for StormState, dataclasses, and channel map parsing."""
 
-from storm_sim.models import StormState, StrikeEvent, StrokePulse
+import pytest
+
+from storm_sim.models import StormState, StrikeEvent, StrokePulse, parse_channel_map
 
 
 def test_storm_state_defaults():
     state = StormState()
-    assert state.pixels == 512
+    assert state.pixels == 4
+    assert state.e131_host == "127.0.0.1"
+    assert state.multicast is False
     assert state.intensity == 0.5
     assert state.fps == 44
     assert state.running is True
     assert not state.is_zero_intensity
     assert state.effective_rate_per_sec > 0
     assert state.effective_rain_level > 0
+    assert state.channel_map is None
 
 
 def test_storm_state_zero_intensity():
@@ -43,3 +48,29 @@ def test_storm_state_ramp():
     state.update_ramp(12.5)
     assert state.intensity == 0.8
     assert state.ramp_duration == 0.0
+
+
+def test_parse_channel_map_valid_zero_based():
+    mapping = parse_channel_map("0:1, 1:5, 2:10, 3:20", pixel_count=4)
+    assert mapping == {0: 0, 1: 4, 2: 9, 3: 19}
+
+
+def test_parse_channel_map_valid_one_based():
+    mapping = parse_channel_map("1:10, 2:20, 3:30, 4:40", pixel_count=4)
+    assert mapping == {0: 9, 1: 19, 2: 29, 3: 39}
+
+
+def test_parse_channel_map_empty():
+    assert parse_channel_map(None, pixel_count=4) is None
+    assert parse_channel_map("", pixel_count=4) is None
+    assert parse_channel_map("   ", pixel_count=4) is None
+
+
+def test_parse_channel_map_invalid_format():
+    with pytest.raises(ValueError, match="Expected format"):
+        parse_channel_map("0-1,1-2", pixel_count=4)
+
+
+def test_parse_channel_map_out_of_bounds():
+    with pytest.raises(ValueError, match="out of bounds"):
+        parse_channel_map("0:1, 4:2", pixel_count=4)

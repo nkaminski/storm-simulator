@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """storm_bundle.py - All-in-One Autonomous Thunderstorm Simulator & Agent Scaffolder
 
-Physics-accurate E1.31 (Monochrome White) lighting and spatial audio simulator
-with integrated desktop test UI, embedded documentation, Freesound.org soundbank
-specifications, and automated agent unpacking capabilities.
+Physics-accurate E1.31 lighting and spatial audio simulator with channel mapping,
+integrated desktop test UI, embedded documentation, and automated procedural synthesis fallback.
 
 Usage:
-    # Run headless CLI simulator:
-    python storm_bundle.py --pixels 512 --intensity 0.65 --e131-host 192.168.1.50
+    # Run headless CLI simulator (default 4 pixels unicast to 127.0.0.1):
+    python storm_bundle.py --intensity 0.65
+
+    # Run with custom unicast IP and channel map:
+    python storm_bundle.py --pixels 4 --e131-host 192.168.1.50 --channel-map "0:1,1:2,2:3,3:4"
 
     # Launch desktop hardware visualizer & control UI:
     python storm_bundle.py --ui
@@ -43,7 +45,7 @@ import soundfile as sf
 # ==============================================================================
 
 # --- Core Simulation & CLI Defaults ---
-DEFAULT_PIXELS: int = 512
+DEFAULT_PIXELS: int = 4
 DEFAULT_START_UNIVERSE: int = 1
 DEFAULT_FPS: int = 44
 DEFAULT_INTENSITY: float = 0.5
@@ -53,6 +55,8 @@ DEFAULT_MAX_RATE_PER_MIN: float = 35.0
 DEFAULT_MASTER_BRIGHTNESS: float = 1.0
 DEFAULT_MASTER_VOLUME: float = 1.0
 DEFAULT_ASSETS_DIR: str = "./assets"
+DEFAULT_E131_HOST: str = "127.0.0.1"
+DEFAULT_MULTICAST: bool = False
 DEFAULT_OSC_HOST: str = "0.0.0.0"
 DEFAULT_OSC_PORT: int = 5005
 
@@ -1325,14 +1329,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--e131-host",
         type=str,
-        default=None,
-        help="Unicast target IP (omit for multicast)",
+        default=DEFAULT_E131_HOST,
+        help="Unicast target IP (default: 127.0.0.1)",
     )
     parser.add_argument(
         "--multicast",
         action="store_true",
-        default=False,
-        help="Force E1.31 multicast mode",
+        default=DEFAULT_MULTICAST,
+        help="Enable E1.31 multicast mode (default: unicast)",
+    )
+    parser.add_argument(
+        "--channel-map",
+        type=str,
+        default=None,
+        metavar="MAP",
+        help="Channel map in format '<sim_ch>:<e131_ch>,...' (e.g. '0:1,1:2,2:3,3:4')",
     )
     parser.add_argument(
         "--universe",
@@ -1405,7 +1416,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    use_multicast = args.multicast or (args.e131_host is None)
+    use_multicast = args.multicast
     min_d = max(ABSOLUTE_MIN_DIST_MILES, args.min_dist)
     max_d = max(min_d + MIN_DIST_SPAN_MILES, args.max_dist)
 

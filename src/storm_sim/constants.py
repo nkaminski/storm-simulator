@@ -10,8 +10,8 @@ from typing import Dict, Tuple
 # CORE SIMULATION & CLI DEFAULTS
 # ==============================================================================
 
-#: Default number of 1-channel monochrome white pixels in the LED strip
-DEFAULT_PIXELS: int = 512
+#: Default number of pixels in the simulated lightning array
+DEFAULT_PIXELS: int = 4
 
 #: Starting E1.31 sACN universe number (typically universe 1)
 DEFAULT_START_UNIVERSE: int = 1
@@ -39,6 +39,12 @@ DEFAULT_MASTER_VOLUME: float = 1.0
 
 #: Default directory for audio sample WAV files
 DEFAULT_ASSETS_DIR: str = "./assets"
+
+#: Default target IP address for E1.31 sACN unicast transmission
+DEFAULT_E131_HOST: str = "127.0.0.1"
+
+#: Default E1.31 transmission mode (False = unicast by default, True = multicast)
+DEFAULT_MULTICAST: bool = False
 
 #: Default network interface bind address for OSC UDP server
 DEFAULT_OSC_HOST: str = "0.0.0.0"

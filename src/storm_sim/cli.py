@@ -1,7 +1,7 @@
 """cli.py - Command-line interface and entry point for storm-sim.
 
-Provides argparse CLI options for headless simulator operation, E1.31 sACN network configuration,
-meteorological parameter controls, and GUI test bench launching.
+Provides argparse CLI options for simulator operation, E1.31 sACN unicast/multicast
+network configuration, channel mapping, meteorological parameter controls, and GUI test bench launching.
 """
 
 from __future__ import annotations
@@ -15,11 +15,13 @@ from typing import List, Optional
 from .constants import (
     ABSOLUTE_MIN_DIST_MILES,
     DEFAULT_ASSETS_DIR,
+    DEFAULT_E131_HOST,
     DEFAULT_INTENSITY,
     DEFAULT_MASTER_BRIGHTNESS,
     DEFAULT_MASTER_VOLUME,
     DEFAULT_MAX_DIST_MILES,
     DEFAULT_MIN_DIST_MILES,
+    DEFAULT_MULTICAST,
     DEFAULT_OSC_HOST,
     DEFAULT_OSC_PORT,
     DEFAULT_PIXELS,
@@ -27,7 +29,7 @@ from .constants import (
     MIN_DIST_SPAN_MILES,
 )
 from .engine import StormCoordinator
-from .models import StormState
+from .models import StormState, parse_channel_map
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
@@ -41,7 +43,7 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog="storm-sim",
-        description="Physics-Based E1.31 (Monochrome White) & Spatial Audio Thunderstorm Simulator",
+        description="Physics-Based E1.31 sACN Lighting & Spatial Audio Thunderstorm Simulator",
     )
     parser.add_argument(
         "-i",
@@ -54,25 +56,32 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "--pixels",
         type=int,
         default=DEFAULT_PIXELS,
-        help="Number of single-channel white pixels",
+        help=f"Number of simulated lightning channels (default: {DEFAULT_PIXELS})",
     )
     parser.add_argument(
         "--e131-host",
         type=str,
-        default=None,
-        help="Unicast target IP (omit for multicast)",
+        default=DEFAULT_E131_HOST,
+        help=f"Target IP for E1.31 unicast transmission (default: {DEFAULT_E131_HOST})",
     )
     parser.add_argument(
         "--multicast",
         action="store_true",
-        default=False,
-        help="Force E1.31 multicast mode",
+        default=DEFAULT_MULTICAST,
+        help="Enable E1.31 multicast mode (default: unicast)",
+    )
+    parser.add_argument(
+        "--channel-map",
+        type=str,
+        default=None,
+        metavar="MAP",
+        help="Channel map in format '<sim_ch>:<e131_ch>,...' (e.g. '0:1,1:2,2:3,3:4')",
     )
     parser.add_argument(
         "--universe",
         type=int,
         default=DEFAULT_START_UNIVERSE,
-        help="Starting E1.31 DMX universe",
+        help=f"Starting E1.31 DMX universe (default: {DEFAULT_START_UNIVERSE})",
     )
     parser.add_argument(
         "--min-dist",
@@ -144,14 +153,15 @@ def main(args: Optional[List[str]] = None) -> None:
     """
     parsed = parse_args(args)
 
-    use_multicast = parsed.multicast or (parsed.e131_host is None)
+    channel_mapping = parse_channel_map(parsed.channel_map, parsed.pixels)
+
     min_d = max(ABSOLUTE_MIN_DIST_MILES, parsed.min_dist)
     max_d = max(min_d + MIN_DIST_SPAN_MILES, parsed.max_dist)
 
     state = StormState(
         pixels=parsed.pixels,
         e131_host=parsed.e131_host,
-        multicast=use_multicast,
+        multicast=parsed.multicast,
         start_universe=parsed.universe,
         intensity=max(0.0, min(1.0, parsed.intensity)),
         min_dist_miles=min_d,
@@ -160,6 +170,7 @@ def main(args: Optional[List[str]] = None) -> None:
         override_rain=parsed.rain,
         master_brightness=max(0.0, min(1.0, parsed.brightness)),
         master_volume=max(0.0, min(1.0, parsed.volume)),
+        channel_map=channel_mapping,
     )
 
     coordinator = StormCoordinator(

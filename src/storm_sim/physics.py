@@ -3,6 +3,22 @@
 Provides the pure mathematical physics engine governing distance sampling, Beer-Lambert
 optical extinction, spatial Gaussian illumination dispersion, multi-stroke envelope
 timing, acoustic speed-of-sound propagation delays, and atmospheric low-pass filtering.
+
+Scientific Model References:
+    1. Optical Extinction & Rain Scattering:
+       - Bouguer (1729), Lambert (1760), Beer (1852): Law of absorption/extinction in media.
+       - Atlas, D. (1953). 'Optical extinction by rainfall', J. Meteor., 10(6), 486-488.
+       - McCartney, E. J. (1976). 'Optics of the Atmosphere: Scattering by Molecules and Particles'.
+       - Koschmieder, H. (1924). 'Theorie der horizontalen Sichtweite' (Koschmieder's Law).
+    2. Lightning Radiative Transfer & Multi-Stroke Channel Physics:
+       - Uman, M. A. (1987). 'The Lightning Discharge', Academic Press.
+       - Thomason, L. W., & Krider, E. P. (1982). 'The effects of clouds on the light produced
+         by lightning', J. Atmos. Sci., 39(9), 2051-2065.
+       - Krider, E. P., & Guo, C. (1983). 'The peak radiant power and energy in lightning return
+         strokes', J. Geophys. Res., 88(C13), 8623-8634.
+    3. Acoustic Propagation & Atmospheric Absorption:
+       - Bass, H. E., et al. (1995). 'Atmospheric absorption of sound', J. Acoust. Soc. Am., 97(1), 680-683.
+       - Few, A. A. (1969). 'Power spectrum of thunder', J. Geophys. Res., 74(28), 6926-6934.
 """
 
 from __future__ import annotations

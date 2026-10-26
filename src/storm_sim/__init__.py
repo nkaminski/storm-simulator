@@ -5,7 +5,7 @@ __version__ = "0.1.0"
 from .audio import AudioEngine
 from .engine import StormCoordinator
 from .lighting import E131LightingEngine
-from .models import StormState, StrikeEvent, StrokePulse
+from .models import StormState, StrikeEvent, StrokePulse, parse_channel_map
 from .osc_control import OSCController
 from .physics import PhysicsEngine
 from .synthesis import ThunderSynthesizer
@@ -21,4 +21,5 @@ __all__ = [
     "StrikeEvent",
     "StrokePulse",
     "ThunderSynthesizer",
+    "parse_channel_map",
 ]

@@ -7,11 +7,12 @@ return stroke sequences, and the runtime state of the storm simulator.
 from __future__ import annotations
 from dataclasses import dataclass, field
 import math
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
 from .constants import (
+    DEFAULT_E131_HOST,
     DEFAULT_FPS,
     DEFAULT_INTENSITY,
     DEFAULT_MASTER_BRIGHTNESS,
@@ -19,6 +20,7 @@ from .constants import (
     DEFAULT_MAX_DIST_MILES,
     DEFAULT_MAX_RATE_PER_MIN,
     DEFAULT_MIN_DIST_MILES,
+    DEFAULT_MULTICAST,
     DEFAULT_PIXELS,
     DEFAULT_START_UNIVERSE,
     INTENSITY_RATE_EXPONENT,
@@ -108,10 +110,11 @@ class StormState:
     """
 
     pixels: int = DEFAULT_PIXELS
-    e131_host: Optional[str] = None
-    multicast: bool = True
+    e131_host: str = DEFAULT_E131_HOST
+    multicast: bool = DEFAULT_MULTICAST
     start_universe: int = DEFAULT_START_UNIVERSE
     fps: int = DEFAULT_FPS
+    channel_map: Optional[Dict[int, int]] = None
 
     intensity: float = DEFAULT_INTENSITY
     min_dist_miles: float = DEFAULT_MIN_DIST_MILES
@@ -189,3 +192,70 @@ class StormState:
         return math.pow(
             max(0.0, min(1.0, self.intensity)), INTENSITY_RAIN_EXPONENT
         )
+
+
+
+def parse_channel_map(
+    map_str: Optional[str], pixel_count: int
+) -> Optional[Dict[int, int]]:
+    """Parses a channel map string into a dictionary of {sim_channel_idx: dmx_slot_offset}.
+
+    Format: '<storm sim channel>:<output/e131 channel>' with support for comma-separated values.
+    Examples:
+        '0:1,1:2,2:3,3:4'  -> Maps sim pixels 0..3 to DMX channels 1..4 (slots 0..3).
+        '1:10,2:20,3:30,4:40' -> Supports 1-based sim pixel indexing to DMX channels.
+
+    Args:
+        map_str: Comma-separated string of '<sim_ch>:<e131_ch>' pairs, or None.
+        pixel_count: Total number of active simulated pixels.
+
+    Returns:
+        Dictionary mapping sim pixel index (0-based) to DMX slot offset (0-based),
+        or None if map_str is empty.
+
+    Raises:
+        ValueError: If entries are malformed, non-integer, or out of bounds.
+    """
+    if not map_str or not map_str.strip():
+        return None
+
+    raw_pairs: List[Tuple[int, int]] = []
+    for item in map_str.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if ":" not in item:
+            raise ValueError(
+                f"Invalid channel map entry '{item}'. Expected format '<sim_ch>:<e131_ch>'."
+            )
+        parts = item.split(":")
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid channel map entry '{item}'. Expected format '<sim_ch>:<e131_ch>'."
+            )
+        try:
+            sim_ch = int(parts[0].strip())
+            dmx_ch = int(parts[1].strip())
+        except ValueError as e:
+            raise ValueError(f"Invalid non-integer channel in '{item}': {e}") from None
+        raw_pairs.append((sim_ch, dmx_ch))
+
+    if not raw_pairs:
+        return None
+
+    # Detect if user entered 1-based sim channel indexing (e.g. 1..pixel_count)
+    all_positive = all(sim_ch > 0 for sim_ch, _ in raw_pairs)
+    is_1_based = all_positive and any(sim_ch == pixel_count for sim_ch, _ in raw_pairs)
+
+    channel_map: Dict[int, int] = {}
+    for sim_ch, dmx_ch in raw_pairs:
+        sim_idx = (sim_ch - 1) if is_1_based else sim_ch
+        if sim_idx < 0 or sim_idx >= pixel_count:
+            raise ValueError(
+                f"Storm sim channel {sim_ch} is out of bounds for pixel count {pixel_count}."
+            )
+        # Output DMX channels in lighting consoles are 1-based: Channel 1 -> offset 0
+        dmx_offset = max(0, dmx_ch - 1 if dmx_ch >= 1 else dmx_ch)
+        channel_map[sim_idx] = dmx_offset
+
+    return channel_map

@@ -1,19 +1,20 @@
-"""lighting.py - E1.31 (sACN) monochrome white lighting engine.
+"""lighting.py - E1.31 (sACN) lighting engine with channel mapping support.
 
-Renders spatial 1D Gaussian flashes across multiple E1.31 universes (512 monochrome
-pixels per universe) with microsecond temporal stroke decay and zero-copy byte streaming.
+Renders spatial 1D Gaussian flashes across multiple E1.31 universes with microsecond
+temporal stroke decay, custom channel mapping (<sim_ch>:<dmx_ch>), and zero-copy byte streaming.
 """
 
 from __future__ import annotations
 import logging
 import math
 import time
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 import sacn
 
 from .constants import (
+    DEFAULT_E131_HOST,
     DMX_MAX_VAL,
     MAX_PIXELS_PER_UNIVERSE,
     STRIKE_ENVELOPE_TAIL_PAD_SEC,
@@ -25,11 +26,11 @@ logger = logging.getLogger("storm_sim.lighting")
 
 
 class E131LightingEngine:
-    """Renders 1D monochrome white lightning envelopes to E1.31 DMX universes.
+    """Renders 1D lightning envelopes to E1.31 DMX universes.
 
     Manages active lightning flashes, renders temporal envelopes sampled across
-    a 1D Gaussian spatial distribution, and outputs sACN packets over UDP multicast
-    or unicast across multiple DMX universes.
+    a 1D Gaussian spatial distribution, and outputs sACN packets over UDP unicast
+    (default) or multicast across configurable DMX channels and universes.
 
     Attributes:
         state: Reference to the shared StormState instance.
@@ -58,36 +59,46 @@ class E131LightingEngine:
         """Starts the underlying sACN transmitter background thread and universe outputs."""
         self.sender.start()
         self._configure_universes(self.state.pixels)
+        target = "Multicast" if self.state.multicast else f"Unicast -> {self.state.e131_host or DEFAULT_E131_HOST}"
         logger.info(
-            "E1.31 Monochrome Engine started: %d white pixels across universes %s (Multicast=%s, Host=%s)",
+            "E1.31 Lighting Engine started: %d pixels across universes %s (%s)",
             self.state.pixels,
             self.universes,
-            self.state.multicast,
-            self.state.e131_host,
+            target,
         )
 
     def _configure_universes(self, pixel_count: int) -> None:
-        """Dynamically configures or reallocates sACN universes to match pixel count.
+        """Dynamically configures or reallocates sACN universes to match pixel count and channel map.
 
-        Since each monochrome white pixel uses exactly 1 DMX channel, 512 pixels can
-        be addressed per universe. Multi-universe spans are allocated sequentially.
+        Defaults to unicast transmission to e131_host (or 127.0.0.1). If a channel map is set,
+        universes are allocated to accommodate all mapped DMX destination offsets.
 
         Args:
-            pixel_count: Total number of 1-channel pixels to allocate.
+            pixel_count: Total number of active simulated pixels.
         """
         for u in self.universes:
             self.sender.deactivate_output(u)
         self.universes.clear()
 
-        num_universes = math.ceil(pixel_count / MAX_PIXELS_PER_UNIVERSE)
-        for idx in range(num_universes):
-            univ = self.state.start_universe + idx
-            self.universes.append(univ)
+        if self.state.channel_map:
+            # Allocate all universes referenced in the channel mapping
+            needed = set(
+                self.state.start_universe + (offset // MAX_PIXELS_PER_UNIVERSE)
+                for offset in self.state.channel_map.values()
+            )
+            self.universes = sorted(needed) if needed else [self.state.start_universe]
+        else:
+            num_universes = max(1, math.ceil(pixel_count / MAX_PIXELS_PER_UNIVERSE))
+            self.universes = [self.state.start_universe + idx for idx in range(num_universes)]
+
+        for univ in self.universes:
             self.sender.activate_output(univ)
-            if self.state.e131_host and not self.state.multicast:
-                self.sender[univ].destination = self.state.e131_host
+            if not self.state.multicast:
+                # Unicast mode (default)
+                self.sender[univ].destination = self.state.e131_host or DEFAULT_E131_HOST
                 self.sender[univ].multicast = False
             else:
+                # Multicast mode
                 self.sender[univ].multicast = True
 
         self.pixel_coords = np.linspace(0.0, 1.0, pixel_count, dtype=np.float32)
@@ -125,7 +136,8 @@ class E131LightingEngine:
 
         Iterates over all active strikes, calculates exponential decay for each
         stroke pulse, sums spatial contributions into a preallocated float32 buffer,
-        clips to [0, 255], and transmits raw bytes to sACN universes.
+        clips to [0, 255], and transmits raw bytes to sACN universes using either
+        sequential packing or the custom channel map.
 
         Args:
             now: Current monotonic timestamp in seconds.
@@ -178,11 +190,24 @@ class E131LightingEngine:
         dmx_bytes = np.clip(self._frame_white, 0, DMX_MAX_VAL).astype(np.uint8)
         self.last_frame_dmx = dmx_bytes
 
-        # Transmit raw bytes directly without intermediate Python integer tuple conversion
-        for idx, univ in enumerate(self.universes):
-            start_px = idx * MAX_PIXELS_PER_UNIVERSE
-            end_px = min(num_pixels, (idx + 1) * MAX_PIXELS_PER_UNIVERSE)
-            self.sender[univ].dmx_data = dmx_bytes[start_px:end_px].tobytes()
+        # Output transmission: custom channel mapping or sequential packing
+        if self.state.channel_map:
+            univ_buffers: Dict[int, bytearray] = {
+                u: bytearray(MAX_PIXELS_PER_UNIVERSE) for u in self.universes
+            }
+            for sim_idx, dmx_offset in self.state.channel_map.items():
+                if sim_idx < len(dmx_bytes):
+                    univ = self.state.start_universe + (dmx_offset // MAX_PIXELS_PER_UNIVERSE)
+                    slot = dmx_offset % MAX_PIXELS_PER_UNIVERSE
+                    if univ in univ_buffers and slot < MAX_PIXELS_PER_UNIVERSE:
+                        univ_buffers[univ][slot] = dmx_bytes[sim_idx]
+            for univ in self.universes:
+                self.sender[univ].dmx_data = bytes(univ_buffers[univ])
+        else:
+            for idx, univ in enumerate(self.universes):
+                start_px = idx * MAX_PIXELS_PER_UNIVERSE
+                end_px = min(num_pixels, (idx + 1) * MAX_PIXELS_PER_UNIVERSE)
+                self.sender[univ].dmx_data = dmx_bytes[start_px:end_px].tobytes()
 
     def stop(self) -> None:
         """Cleanly stops the sACN sender thread and clears outputs."""
