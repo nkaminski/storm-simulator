@@ -1,21 +1,19 @@
-# Storm-Sim: Physics-Accurate Thunderstorm Simulator
+# Storm-Simulator: Physics-Accurate Thunderstorm Simulator
 
-Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator with customizable channel mapping, integrated desktop visualizer UI, and automated procedural synthesis fallback.
+Physics-accurate E1.31/sACN lighting and spatial audio thunderstorm simulator with customizable channel mapping, integrated desktop visualizer UI, and automated procedural synthesis fallback.
 
 > [!NOTE]
-> This codebase, lighting engine, and DSP synthesis pipeline were produced in substantial capacity using generative AI. All underlying physical modeling, optical attenuation equations, and acoustic calibrations are derived strictly from empirical ground truth, peer-reviewed atmospheric physics literature, and real-world audio measurements (see [MODEL_CITATIONS.md](MODEL_CITATIONS.md)).
+> This codebase, lighting engine, and DSP synthesis pipeline were produced in substantial capacity using generative AI. All underlying physical modeling, optical attenuation models, and acoustic calibrations are derived strictly from empirical ground truth, peer-reviewed atmospheric physics literature, real-world audio measurement and human feedback on synthesized outputs (see [MODEL_CITATIONS.md](MODEL_CITATIONS.md)).
 
 ---
 
 ## Features
 
-- **E1.31 sACN Lighting Output with Channel Mapping:** Defaults to 4 pixels over standard unicast, with flexible `<sim_ch>:<e131_ch>` channel mapping supporting multi-universe configurations.
+- **E1.31/sACN Lighting Output with Channel Mapping:** Defaults to 4 pixels over standard unicast, with flexible `<sim_ch>:<e131_ch>` channel mapping supporting multi-universe configurations.
 - **sACN Passthrough Mode with Nonzero Override:** Feed a full DMX universe from an external lighting desk through the simulator. Desk channels pass through untouched, and only channels with nonzero lightning output override the desk (remapping never shifts or alters passthrough channels).
-- **Physical Optical Attenuation:** Inverse-square geometric spreading combined with Beer-Lambert atmospheric scattering and rain extinction (see [Scientific Citations & Model References](#scientific-citations--model-references)).
+- **Optical Attenuation Model:** Inverse-square geometric spreading combined with Beer-Lambert atmospheric scattering and rain extinction (see [Scientific Citations & Model References](#scientific-citations--model-references)).
 - **Spatial Multi-Stroke Lightning:** Microsecond return stroke envelopes and distance-scaled Gaussian spread across the simulated lightning channels.
 - **Real-Time Acoustic DSP:** Speed-of-sound propagation delay (\(\approx 4.69\text{ s/mi}\)), atmospheric low-pass filtering (scipy Butterworth), and constant-power stereo panning matching lighting epicenters.
-- **Zero-Intensity Killswitch:** Instantly silences background rain and cancels all pending thunderclaps and flashes when intensity reaches `0.0`.
-- **Procedural Synthesis Fallback:** Generates realistic synthetic multi-burst thunder models and seamless stereo rain beds when no audio WAV assets are present.
 - **Full OSC Control:** Live parameter manipulation, intensity ramps, and manual strike triggers over UDP.
 - **Desktop Visualizer:** Tkinter test bench with live pixel strip canvas, click-to-strike support, and wave-front transit queue.
 
@@ -23,7 +21,7 @@ Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator wi
 
 ## Scientific Citations & Model References
 
-The mathematical models for optical attenuation, atmospheric extinction, and acoustic propagation are grounded in established atmospheric physics literature. For complete bibliographic citations, paper links, and mathematical derivations, see [MODEL_CITATIONS.md](MODEL_CITATIONS.md).
+The mathematical models for optical attenuation, atmospheric scattering, and acoustic propagation are grounded in established physics literature. For complete bibliographic citations, paper links, and mathematical derivations, see [MODEL_CITATIONS.md](MODEL_CITATIONS.md).
 
 Key foundation papers include:
 - **Optical Extinction & Rainfall Scattering:** [Bouguer (1729)](MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Lambert (1760)](MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Beer (1852)](https://doi.org/10.1002/andp.18521620505), and [Atlas (1953)](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
@@ -146,7 +144,7 @@ storm-synth --small-speakers --out-dir ./assets
 - **Soft Saturation:** Applies musical even-order harmonic distortion to create visceral, punchy low-end presence on small drivers without digital clipping.
 - **CLI Startup Configuration:** Note that `--small-speakers` is configured at startup on the CLI (rather than toggled live in the GUI) because it initializes the procedural DSP voice and soundbank generation before playback begins.
 
-### sACN Passthrough Mode Examples
+### sACN Passthrough Mode
 
 When `--passthrough <address:port>` is supplied, `storm-sim` listens for an incoming full DMX universe from an external lighting effects console or software desk:
 - **Passthrough Preservation:** All 512 channels from the desk pass straight through 1:1 to the output fixtures without alterations.
@@ -177,7 +175,7 @@ The lighting subsystem uses a **3 kW tungsten-halogen baseline (~78,000 lumens)*
 - **Full Output ($DMX = 255$, 100%):** Equivalent to 3,000 Watts of incandescent/halogen stage illumination (~78,000 lm), representing an unattenuated strike ($d \le 1.2\text{ mi}$) saturating the visual field.
 - **Mid-Distance Flashes ($DMX = 100–180$):** Equivalent to 1,200 W – 2,000 W of tungsten output (~30,000 – 50,000 lm) casting soft, broad cloud illumination.
 - **Distant Sheet Horizon Floor ($DMX = 60–80$):** Equivalent to 700 W – 900 W of tungsten output (~18,000 – 24,000 lm) preserving visible sheet lightning across water.
-- **AC LED 60 Hz Dynamics & Snappy Decay:** Fixture on-time is locked to 4 AC cycles ($1/15\text{ s} \approx 66.7\text{ ms}$) to overcome bridge rectifier charging and forward diode voltage ($V_f$), followed by fast, snappy exponential decay ($k = 4.2$) and 3–6 AC cycle gaps ($50–100\text{ ms}$) for TRIAC zero-crossing commutation.
+- **AC LED Dynamics Model:** Fixture on-time is locked to 4 AC cycles ($1/15\text{ s} \approx 66.7\text{ ms}$) to overcome LED driver startup and forward diode voltage ($V_f$), followed by exponential decay ($k = 4.2$) and 3–6 AC cycle gaps ($50–100\text{ ms}$) for TRIAC zero-crossing commutation.
 
 ### 1. Typical / Moderate Illinois Thunderstorm (Default Experience)
 *Realistic prairie summer storm cell passing overhead with rolling thunder and dramatic water/cloud reflections.*
@@ -207,7 +205,7 @@ The lighting subsystem uses a **3 kW tungsten-halogen baseline (~78,000 lumens)*
   - `rain`: `0.20` (light patter)
   - **Acoustic / Optical Characteristics:** Severe atmospheric low-pass filtering (\(f_c \approx 130 - 300\text{ Hz}\)) attenuates all high frequencies into warm sub-bass rumbles; acoustic transit delays span 14 to 70 seconds.
 
-### 3. SEVERE Thunderstorm (Lake Michigan Squall / Derecho / Supercell)
+### 3. Severe Thunderstorm
 *Violent, relentless convective squall line with deafening overhead claps, torrential rain, and rapid-fire multi-stroke strobing.*
 - **Aesthetic:** Blinding multi-stroke lightning barrages occurring every 1–2 seconds, instantaneous unattenuated acoustic shockwaves (\(<0.25\text{ s}\) delay, \(f_c > 14\text{ kHz}\)), and dense hydrometeor optical extinction from torrential rainfall.
 - **CLI Command:**
@@ -265,10 +263,3 @@ To run the test suite:
 ```bash
 pytest
 ```
-
----
-
-## Development & Ground Truth Attribution
-
-- **Physical & Acoustic Ground Truth:** The underlying physical and mathematical models—including Bouguer-Lambert-Beer optical extinction, AC line zero-crossing commutation dynamics, cylindrical acoustic spreading, tortuous channel frequency clustering, and outdoor blast shockwave profiles—are derived strictly from empirical ground truth, peer-reviewed atmospheric physics literature (see [MODEL_CITATIONS.md](MODEL_CITATIONS.md)), and physical audio reference recordings.
-- **Generative AI Production:** The software codebase, DSP synthesis algorithms, E1.31 sACN network architecture, desktop visualizer test bench, and automated test suite were produced in substantial capacity using generative artificial intelligence.
