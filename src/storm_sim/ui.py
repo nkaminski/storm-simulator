@@ -210,17 +210,6 @@ class StormDesktopUI:
             lambda v: setattr(self.state, "master_volume", float(v)),
         )
 
-        self.var_small_speakers = self.tk.BooleanVar(
-            value=getattr(self.coordinator.audio, "small_speakers", False)
-        )
-        chk_spk = self.ttk.Checkbutton(
-            ctrl_panel,
-            text="Compact Speakers Mode (Elevate Infrasonics 48-140 Hz)",
-            variable=self.var_small_speakers,
-            command=self._on_toggle_small_speakers,
-        )
-        chk_spk.pack(anchor=self.tk.W, pady=(2, 6))
-
         sep = self.ttk.Separator(ctrl_panel, orient="horizontal")
         sep.pack(fill=self.tk.X, pady=10)
 
@@ -356,12 +345,6 @@ class StormDesktopUI:
     def _on_max_dist_change(self, val: float) -> None:
         """Callback for maximum strike distance slider changes."""
         self.state.max_dist_miles = max(val, self.state.min_dist_miles + 0.05)
-
-    def _on_toggle_small_speakers(self) -> None:
-        """Toggles raised infrasonics for compact speakers lacking subwoofers."""
-        enabled = bool(self.var_small_speakers.get())
-        if hasattr(self.coordinator, "audio"):
-            self.coordinator.audio.small_speakers = enabled
 
     def _on_toggle_overrides(self) -> None:
         """Toggles decoupled manual micro-overrides for strike rate and rain volume."""

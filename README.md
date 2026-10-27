@@ -106,22 +106,42 @@ storm-sim-ui
 | `--osc-host` | str | `0.0.0.0` | OSC listen bind address |
 | `--osc-port` | int | `5005` | OSC UDP port |
 | `--ui` | flag | `False` | Launch native desktop hardware visualizer UI |
-| `--small-speakers` | flag | `False` | Elevate infrasonics (48-140 Hz with saturation) for compact monitors lacking subwoofers |
+| `--small-speakers` | flag | `False` | CLI-only startup flag: elevates infrasonics (48-140 Hz with saturation) for compact monitors lacking subwoofers |
 
-### Channel Mapping Examples
+### Channel Mapping & Fixture Grouping Examples
 
-The `--channel-map` flag maps simulated lightning channels to output E1.31 DMX channels:
+The `--channel-map` flag maps simulated lightning channels to output E1.31 DMX channels. It supports single channels, channel ranges (`start-end` or `start..end`), multi-channel grouping (mirroring a single simulated flash across multiple DMX fixtures simultaneously), and both 0-based and 1-based simulator channel indexing:
 
 ```bash
-# Map 4 simulator pixels (0-3) to DMX channels 1, 2, 3, 4:
+# Basic 1:1 mapping (4 simulator pixels 0-3 mapped to DMX channels 1, 2, 3, 4):
 storm-sim --pixels 4 --channel-map "0:1,1:2,2:3,3:4"
 
-# Map 4 simulator pixels to custom lighting fixture channels:
+# Custom fixture channels across a venue rig:
 storm-sim --pixels 4 --channel-map "0:10,1:25,2:50,3:100"
 
-# 1-based simulator channel indexing is also supported:
-storm-sim --pixels 4 --channel-map "1:10,2:25,3:50,4:100"
+# Real-world fixture grouping with individual channels and grouped ranges:
+# (Sim 0-2 drive channels 45, 46, 47; Sim 3 drives channels 88-90 as a group; Sim 4 drives 93-95 as a group)
+storm-sim --pixels 5 --e131-host 192.168.1.50 --channel-map "0:45,1:46,2:47,3:88-90,4:93-95"
+
+# 1-based simulator channel indexing is also fully supported:
+storm-sim --pixels 5 --e131-host 192.168.1.50 --channel-map "1:45,2:46,3:47,4:88-90,5:93-95"
 ```
+
+### Compact Speaker Audio Mode (`--small-speakers`)
+
+Thunder acoustics concentrate substantial acoustic energy in the deep infrasonic sub-bass region ($20–80\text{ Hz}$). When operating on desktop monitors, bookshelf speakers, or laptops lacking a dedicated subwoofer, standard transducers cannot reproduce sub-audible pressure waves.
+
+Supply the `--small-speakers` CLI flag at startup to re-tune the synthesis engine:
+```bash
+# Run simulator with compact speaker tuning
+storm-sim --small-speakers --ui
+
+# Or pre-generate a soundbank optimized for compact monitors
+storm-synth --small-speakers --out-dir ./assets
+```
+- **Frequency Shift:** Elevates sub-bass fundamental pulses from $20–82\text{ Hz}$ to $48–140\text{ Hz}$.
+- **Soft Saturation:** Applies musical even-order harmonic distortion to create visceral, punchy low-end presence on small drivers without digital clipping.
+- **CLI Startup Configuration:** Note that `--small-speakers` is configured at startup on the CLI (rather than toggled live in the GUI) because it initializes the procedural DSP voice and soundbank generation before playback begins.
 
 ### sACN Passthrough Mode Examples
 
@@ -151,10 +171,10 @@ The optical engine is tuned to err toward the dramatic aesthetic of being on the
 
 ### Photometric Calibration Benchmark (3 kW Tungsten Reference)
 The lighting subsystem uses a **3 kW tungsten-halogen baseline (~78,000 lumens)** as its photometric full-scale calibration benchmark:
-- **Full Output ($DMX = 255$, 100%):** Equivalent to 3,000 Watts of incandescent/halogen stage illumination (~78,000 lm), representing an unattenuated direct strike ($d \le 0.5\text{ mi}$) saturating the visual field.
-- **Mid-Distance Flashes ($DMX = 100–170$):** Equivalent to 1,200 W – 2,000 W of tungsten output (~30,000 – 50,000 lm) casting soft, broad cloud illumination.
-- **Distant Sheet Horizon Floor ($DMX = 50–70$):** Equivalent to 600 W – 800 W of tungsten output (~15,000 – 21,000 lm) preserving visible sheet lightning across water.
-- **AC LED 60 Hz Dynamics:** Fixture on-time is locked to 4 AC cycles ($1/15\text{ s} \approx 66.7\text{ ms}$) to overcome bridge rectifier charging and forward diode voltage ($V_f$), with 3–6 AC cycle gaps ($50–100\text{ ms}$) for TRIAC zero-crossing commutation.
+- **Full Output ($DMX = 255$, 100%):** Equivalent to 3,000 Watts of incandescent/halogen stage illumination (~78,000 lm), representing an unattenuated strike ($d \le 1.2\text{ mi}$) saturating the visual field.
+- **Mid-Distance Flashes ($DMX = 100–180$):** Equivalent to 1,200 W – 2,000 W of tungsten output (~30,000 – 50,000 lm) casting soft, broad cloud illumination.
+- **Distant Sheet Horizon Floor ($DMX = 60–80$):** Equivalent to 700 W – 900 W of tungsten output (~18,000 – 24,000 lm) preserving visible sheet lightning across water.
+- **AC LED 60 Hz Dynamics & Snappy Decay:** Fixture on-time is locked to 4 AC cycles ($1/15\text{ s} \approx 66.7\text{ ms}$) to overcome bridge rectifier charging and forward diode voltage ($V_f$), followed by fast, snappy exponential decay ($k = 4.2$) and 3–6 AC cycle gaps ($50–100\text{ ms}$) for TRIAC zero-crossing commutation.
 
 ### 1. Typical / Moderate Illinois Thunderstorm (Default Experience)
 *Realistic prairie summer storm cell passing overhead with rolling thunder and dramatic water/cloud reflections.*
