@@ -148,18 +148,18 @@ AC_CYCLE_SEC: float = 1.0 / AC_MAINS_FREQ_HZ
 AC_HALF_CYCLE_SEC: float = AC_CYCLE_SEC / 2.0
 
 #: Number of 60 Hz AC cycles required for AC LED lights to charge internal power supplies
-#: and reach full forward conduction (5 AC line cycles ~ 83.3 ms)
-AC_LED_MIN_STRIKE_CYCLES: int = 5
+#: and reach full forward conduction (4 AC line cycles = 1/15 s ~ 66.7 ms)
+AC_LED_MIN_STRIKE_CYCLES: int = 4
 
-#: Minimum duration a stroke is held in full ON state (5 AC line cycles ~83.3 ms >= 1/15 s) to ensure
+#: Minimum duration a stroke is held in full ON state (4 AC line cycles = 1/15 s ~66.7 ms) to ensure
 #: AC LED drivers and phase-cut dimmers have adequate response time to strike and illuminate.
 MIN_STROKE_ON_TIME_SEC: float = AC_LED_MIN_STRIKE_CYCLES * AC_CYCLE_SEC
 
 #: Range of durations (seconds) for primary return stroke pulse (on-time plateau + exponential decay)
-PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.24, 0.42)
+PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.15, 0.26)
 
 #: Range of durations (seconds) for secondary stepped return strokes (on-time plateau + exponential decay)
-SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.16, 0.30)
+SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.10, 0.18)
 
 #: Amplitude range for secondary return strokes relative to primary stroke (1.0)
 SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.65, 0.98)
@@ -170,11 +170,11 @@ SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.65, 0.98)
 INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (3.0 * AC_CYCLE_SEC, 6.0 * AC_CYCLE_SEC)
 
 #: Exponential decay constant for return stroke luminous envelope: exp(-k * dt / dur)
-#: Tuned to 2.4 for natural phosphor / ionized air afterglow retention
-STROKE_DECAY_TIME_CONSTANT: float = 2.4
+#: Tuned to 4.2 for fast, snappy, aggressive flash decay
+STROKE_DECAY_TIME_CONSTANT: float = 4.2
 
 #: Tail padding (seconds) added after last stroke before event is pruned
-STRIKE_ENVELOPE_TAIL_PAD_SEC: float = 0.15
+STRIKE_ENVELOPE_TAIL_PAD_SEC: float = 0.08
 
 
 # ==============================================================================
