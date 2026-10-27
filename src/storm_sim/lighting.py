@@ -16,6 +16,7 @@ import sacn
 
 from .constants import (
     DEFAULT_E131_HOST,
+    DIFFUSE_SCATTERING_FLOOR,
     DMX_MAX_VAL,
     MAX_PIXELS_PER_UNIVERSE,
     MIN_STROKE_ON_TIME_SEC,
@@ -168,9 +169,15 @@ class E131LightingEngine:
         if not self.state.is_zero_intensity:
             # Precompute spatial profile ahead of time so render loop never calls np.exp
             if strike.spatial_profile is None or len(strike.spatial_profile) != len(self.pixel_coords):
-                strike.spatial_profile = np.exp(
+                core = np.exp(
                     -((self.pixel_coords - strike.epicenter) ** 2)
                     / (2.0 * (strike.spatial_sigma**2))
+                )
+                # Blend concentrated return-stroke core with diffuse cloud-sheet scattering
+                strike.spatial_profile = np.clip(
+                    core * (1.0 - DIFFUSE_SCATTERING_FLOOR) + DIFFUSE_SCATTERING_FLOOR,
+                    0.0,
+                    1.0,
                 ).astype(np.float32)
             self.active_strikes.append(strike)
 

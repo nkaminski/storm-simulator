@@ -82,7 +82,7 @@ DISTANCE_ALPHA_GAMMA: float = 1.4
 DISTANCE_BETA_GAMMA: float = 0.8
 
 #: Maximum number of secondary return strokes added to a strike at peak intensity
-MAX_EXTRA_STROKES_AT_PEAK: int = 5
+MAX_EXTRA_STROKES_AT_PEAK: int = 7
 
 #: Hard lower clamp on strike distance in miles to avoid division by zero
 ABSOLUTE_MIN_DIST_MILES: float = 0.05
@@ -122,18 +122,21 @@ RAIN_OPTICAL_EXTINCTION_SCALE: float = 0.05
 #: Distance offset parameter (miles) softening singularity for immediate overhead strikes
 OPTICAL_SOFTENING_DIST_MILES: float = 0.45
 
-#: Normalization offset calibrated so close strikes (<=0.5 mi) reach full 3kW tungsten saturation (DMX 255)
-#: while mid-distance strikes (1-2 mi) scale down through 2kW to 1kW equivalents
-OPTICAL_NORM_OFFSET: float = 0.65
+#: Normalization offset calibrated so strikes reach full 3kW tungsten saturation (DMX 255)
+#: across close-to-mid distances (0 to 1.2+ miles)
+OPTICAL_NORM_OFFSET: float = 1.20
 
-#: Minimum visible peak brightness floor (8% ~ 240W tungsten equiv / DMX 20) above AC LED drop-out threshold
-MIN_PEAK_BRIGHTNESS: float = 0.08
+#: Minimum visible peak brightness floor (25% ~ 750W tungsten equiv / DMX 64)
+MIN_PEAK_BRIGHTNESS: float = 0.25
 
 #: Minimum Gaussian flash width (sigma, normalized to strip length [0.0 - 1.0])
-BASE_SPATIAL_SIGMA: float = 0.035
+BASE_SPATIAL_SIGMA: float = 0.22
 
 #: Increase in Gaussian flash width per mile of distance (distant strikes wash wide)
-SPATIAL_SIGMA_PER_MILE: float = 0.065
+SPATIAL_SIGMA_PER_MILE: float = 0.12
+
+#: Diffuse cloud-scattering baseline floor ensuring wide rig-wide illumination
+DIFFUSE_SCATTERING_FLOOR: float = 0.20
 
 #: Standard AC line mains frequency in North America (60 Hz)
 AC_MAINS_FREQ_HZ: float = 60.0
@@ -145,21 +148,21 @@ AC_CYCLE_SEC: float = 1.0 / AC_MAINS_FREQ_HZ
 AC_HALF_CYCLE_SEC: float = AC_CYCLE_SEC / 2.0
 
 #: Number of 60 Hz AC cycles required for AC LED lights to charge internal power supplies
-#: and reach full forward conduction (2 cycles warm-up + 2 cycles sustained emission = 4 cycles = 1/15 s)
-AC_LED_MIN_STRIKE_CYCLES: int = 4
+#: and reach full forward conduction (5 AC line cycles ~ 83.3 ms)
+AC_LED_MIN_STRIKE_CYCLES: int = 5
 
-#: Minimum duration a stroke is held in full ON state (1/15th sec ~66.7 ms = 4 AC line cycles) to ensure
+#: Minimum duration a stroke is held in full ON state (5 AC line cycles ~83.3 ms >= 1/15 s) to ensure
 #: AC LED drivers and phase-cut dimmers have adequate response time to strike and illuminate.
 MIN_STROKE_ON_TIME_SEC: float = AC_LED_MIN_STRIKE_CYCLES * AC_CYCLE_SEC
 
 #: Range of durations (seconds) for primary return stroke pulse (on-time plateau + exponential decay)
-PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.13, 0.25)
+PRIMARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.24, 0.42)
 
 #: Range of durations (seconds) for secondary stepped return strokes (on-time plateau + exponential decay)
-SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.10, 0.17)
+SECONDARY_STROKE_DURATION_RANGE_SEC: Tuple[float, float] = (0.16, 0.30)
 
 #: Amplitude range for secondary return strokes relative to primary stroke (1.0)
-SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.35, 0.85)
+SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.65, 0.98)
 
 #: Time interval (seconds) between successive return strokes in a single strike.
 #: Tuned to 3 - 6 full 60 Hz AC cycles (50 ms - 100 ms) so AC phase dimmers can commutate
@@ -167,10 +170,11 @@ SECONDARY_STROKE_AMP_RANGE: Tuple[float, float] = (0.35, 0.85)
 INTER_STROKE_GAP_RANGE_SEC: Tuple[float, float] = (3.0 * AC_CYCLE_SEC, 6.0 * AC_CYCLE_SEC)
 
 #: Exponential decay constant for return stroke luminous envelope: exp(-k * dt / dur)
-STROKE_DECAY_TIME_CONSTANT: float = 4.5
+#: Tuned to 2.4 for natural phosphor / ionized air afterglow retention
+STROKE_DECAY_TIME_CONSTANT: float = 2.4
 
 #: Tail padding (seconds) added after last stroke before event is pruned
-STRIKE_ENVELOPE_TAIL_PAD_SEC: float = 0.05
+STRIKE_ENVELOPE_TAIL_PAD_SEC: float = 0.15
 
 
 # ==============================================================================

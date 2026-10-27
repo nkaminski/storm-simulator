@@ -133,8 +133,9 @@ class PhysicsEngine:
         # by 0 to N secondary pulses along the ionized channel.
         # Flashes enforce a minimum on-time (>= 1/15 sec ~ 66.7 ms) so physical
         # DMX fixtures, dimmers, and LED drivers have adequate time to strike.
-        max_extra_strokes = int(round(MAX_EXTRA_STROKES_AT_PEAK * state.intensity))
-        num_strokes = 1 + random.randint(0, max_extra_strokes)
+        min_extra = 1 if state.intensity >= 0.25 else 0
+        max_extra_strokes = max(min_extra, int(round(MAX_EXTRA_STROKES_AT_PEAK * state.intensity)))
+        num_strokes = 1 + random.randint(min_extra, max_extra_strokes)
         strokes: List[StrokePulse] = []
         t_cursor = 0.0
         for idx in range(num_strokes):
