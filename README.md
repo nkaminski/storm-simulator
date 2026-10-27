@@ -23,10 +23,10 @@ Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator wi
 
 ## Scientific Citations & Model References
 
-The mathematical models for optical attenuation, atmospheric extinction, and acoustic propagation are grounded in established atmospheric physics literature. For complete bibliographic citations, paper links, and mathematical derivations, see [MODEL_CITATIONS.md](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md).
+The mathematical models for optical attenuation, atmospheric extinction, and acoustic propagation are grounded in established atmospheric physics literature. For complete bibliographic citations, paper links, and mathematical derivations, see [MODEL_CITATIONS.md](MODEL_CITATIONS.md).
 
 Key foundation papers include:
-- **Optical Extinction & Rainfall Scattering:** [Bouguer (1729)](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Lambert (1760)](file:///Users/nashkaminski/Developer/storm-simulator/MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Beer (1852)](https://doi.org/10.1002/andp.18521620505), and [Atlas (1953)](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
+- **Optical Extinction & Rainfall Scattering:** [Bouguer (1729)](MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Lambert (1760)](MODEL_CITATIONS.md#bouguer-lambert-beer-law), [Beer (1852)](https://doi.org/10.1002/andp.18521620505), and [Atlas (1953)](https://doi.org/10.1175/1520-0469(1953)010%3C0486:OEBR%3E2.0.CO;2).
 - **Lightning Radiative Transfer & Multi-Stroke Physics:** Uman (1987), [Thomason & Krider (1982)](https://doi.org/10.1175/1520-0469(1982)039%3C2051:TEOCOT%3E2.0.CO;2), and [Krider & Guo (1983)](https://doi.org/10.1029/JC088iC13p08623).
 - **Acoustic Wave Propagation & Atmospheric Absorption:** [Bass et al. (1995)](https://doi.org/10.1121/1.412989) (ISO 9613-1) and [Few (1969)](https://doi.org/10.1029/JC074i028p06926).
 
@@ -246,7 +246,7 @@ All simulation parameters can be modified dynamically over UDP OSC:
 
 ## Sound Effects (SFX) Asset Curation Guide
 
-For Freesound.org catalog IDs, acoustic requirements, and asset normalization guidelines, see [SFX_GUIDE.md](file:///Users/nashkaminski/Developer/storm-simulator/SFX_GUIDE.md).
+For Freesound.org catalog IDs, acoustic requirements, and asset normalization guidelines, see [SFX_GUIDE.md](SFX_GUIDE.md).
 
 ---
 
