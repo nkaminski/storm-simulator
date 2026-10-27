@@ -7,7 +7,7 @@ return stroke sequences, and the runtime state of the storm simulator.
 from __future__ import annotations
 from dataclasses import dataclass, field
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -116,7 +116,7 @@ class StormState:
     e131_host: str = DEFAULT_E131_HOST
     start_universe: int = DEFAULT_START_UNIVERSE
     fps: int = DEFAULT_FPS
-    channel_map: Optional[Dict[int, int]] = None
+    channel_map: Optional[Dict[int, Union[int, List[int]]]] = None
     passthrough_listen: Optional[str] = None
     passthrough_universe: Optional[int] = None
 
@@ -212,22 +212,43 @@ class StormState:
 
 
 
+def _parse_dmx_targets(dmx_str: str) -> List[int]:
+    """Parses a DMX channel or inclusive channel range (e.g. '88', '88-90', '88..90')."""
+    s = dmx_str.strip()
+    if ".." in s:
+        parts = s.split("..")
+        if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+            start, end = int(parts[0].strip()), int(parts[1].strip())
+            step = 1 if end >= start else -1
+            return list(range(start, end + step, step))
+    elif "-" in s and not s.startswith("-"):
+        parts = s.split("-")
+        if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+            start, end = int(parts[0].strip()), int(parts[1].strip())
+            step = 1 if end >= start else -1
+            return list(range(start, end + step, step))
+    return [int(s)]
+
+
 def parse_channel_map(
     map_str: Optional[str], pixel_count: int
-) -> Optional[Dict[int, int]]:
-    """Parses a channel map string into a dictionary of {sim_channel_idx: dmx_slot_offset}.
+) -> Optional[Dict[int, Union[int, List[int]]]]:
+    """Parses a channel map string into a dictionary of {sim_channel_idx: dmx_slot_offset(s)}.
 
-    Format: '<storm sim channel>:<output/e131 channel>' with support for comma-separated values.
+    Format: '<storm sim channel>:<output/e131 channel>' with support for comma-separated values,
+    grouped target channels, and inclusive range syntax.
     Examples:
-        '0:1,1:2,2:3,3:4'  -> Maps sim pixels 0..3 to DMX channels 1..4 (slots 0..3).
-        '1:10,2:20,3:30,4:40' -> Supports 1-based sim pixel indexing to DMX channels.
+        '0:1,1:2,2:3,3:4'           -> Maps sim pixels 0..3 to DMX channels 1..4 (slots 0..3).
+        '1:10,2:20,3:30,4:40'       -> Supports 1-based sim pixel indexing to DMX channels.
+        '0:45,1:46,2:47,3:88-90,4:93-95' -> Maps sim channels with grouped DMX channel ranges.
+        '0:45,1:46,2:47,3:88,3:89,3:90'  -> Maps multi-channel groupings via repeat keys.
 
     Args:
         map_str: Comma-separated string of '<sim_ch>:<e131_ch>' pairs, or None.
         pixel_count: Total number of active simulated pixels.
 
     Returns:
-        Dictionary mapping sim pixel index (0-based) to DMX slot offset (0-based),
+        Dictionary mapping sim pixel index (0-based) to DMX slot offset (0-based) or list of offsets,
         or None if map_str is empty.
 
     Raises:
@@ -252,10 +273,11 @@ def parse_channel_map(
             )
         try:
             sim_ch = int(parts[0].strip())
-            dmx_ch = int(parts[1].strip())
+            dmx_targets = _parse_dmx_targets(parts[1].strip())
         except ValueError as e:
             raise ValueError(f"Invalid non-integer channel in '{item}': {e}") from None
-        raw_pairs.append((sim_ch, dmx_ch))
+        for dmx_ch in dmx_targets:
+            raw_pairs.append((sim_ch, dmx_ch))
 
     if not raw_pairs:
         return None
@@ -264,7 +286,7 @@ def parse_channel_map(
     all_positive = all(sim_ch > 0 for sim_ch, _ in raw_pairs)
     is_1_based = all_positive and any(sim_ch == pixel_count for sim_ch, _ in raw_pairs)
 
-    channel_map: Dict[int, int] = {}
+    multi_map: Dict[int, List[int]] = {}
     for sim_ch, dmx_ch in raw_pairs:
         sim_idx = (sim_ch - 1) if is_1_based else sim_ch
         if sim_idx < 0 or sim_idx >= pixel_count:
@@ -273,7 +295,11 @@ def parse_channel_map(
             )
         # Output DMX channels in lighting consoles are 1-based: Channel 1 -> offset 0
         dmx_offset = max(0, dmx_ch - 1 if dmx_ch >= 1 else dmx_ch)
-        channel_map[sim_idx] = dmx_offset
+        multi_map.setdefault(sim_idx, []).append(dmx_offset)
+
+    channel_map: Dict[int, Union[int, List[int]]] = {}
+    for sim_idx, offsets in multi_map.items():
+        channel_map[sim_idx] = offsets[0] if len(offsets) == 1 else offsets
 
     return channel_map
 

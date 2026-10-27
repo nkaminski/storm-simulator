@@ -65,6 +65,38 @@ def test_parse_channel_map_valid_one_based():
     assert mapping == {0: 9, 1: 19, 2: 29, 3: 39}
 
 
+def test_parse_channel_map_ranges_and_groups():
+    mapping = parse_channel_map("0:45, 1:46, 2:47, 3:88-90, 4:93-95", pixel_count=5)
+    assert mapping == {
+        0: 44,
+        1: 45,
+        2: 46,
+        3: [87, 88, 89],
+        4: [92, 93, 94],
+    }
+
+    # Also test 1-based indexing with range
+    mapping_1based = parse_channel_map("1:45, 2:46, 3:47, 4:88-90, 5:93-95", pixel_count=5)
+    assert mapping_1based == {
+        0: 44,
+        1: 45,
+        2: 46,
+        3: [87, 88, 89],
+        4: [92, 93, 94],
+    }
+
+    # Also test multi-key repeat grouping
+    mapping_multi = parse_channel_map("0:45, 1:46, 2:47, 3:88, 3:89, 3:90, 4:93, 4:94, 4:95", pixel_count=5)
+    assert mapping_multi == {
+        0: 44,
+        1: 45,
+        2: 46,
+        3: [87, 88, 89],
+        4: [92, 93, 94],
+    }
+
+
+
 def test_parse_channel_map_empty():
     assert parse_channel_map(None, pixel_count=4) is None
     assert parse_channel_map("", pixel_count=4) is None

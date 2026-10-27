@@ -133,10 +133,15 @@ class E131LightingEngine:
 
         if self.state.channel_map:
             # Allocate all universes referenced in the channel mapping
-            needed = set(
-                self.state.start_universe + (offset // MAX_PIXELS_PER_UNIVERSE)
-                for offset in self.state.channel_map.values()
-            )
+            needed = set()
+            for offset_or_list in self.state.channel_map.values():
+                offsets = (
+                    offset_or_list
+                    if isinstance(offset_or_list, (list, tuple))
+                    else [offset_or_list]
+                )
+                for offset in offsets:
+                    needed.add(self.state.start_universe + (offset // MAX_PIXELS_PER_UNIVERSE))
             self.universes = sorted(needed) if needed else [self.state.start_universe]
         else:
             num_universes = max(1, math.ceil(pixel_count / MAX_PIXELS_PER_UNIVERSE))
@@ -267,15 +272,21 @@ class E131LightingEngine:
                 )
                 for u in self.universes
             }
-            for sim_idx, dmx_offset in self.state.channel_map.items():
+            for sim_idx, offset_or_list in self.state.channel_map.items():
                 if sim_idx < len(dmx_bytes):
                     val = dmx_bytes[sim_idx]
-                    univ = self.state.start_universe + (dmx_offset // MAX_PIXELS_PER_UNIVERSE)
-                    slot = dmx_offset % MAX_PIXELS_PER_UNIVERSE
-                    if univ in univ_buffers and slot < MAX_PIXELS_PER_UNIVERSE:
-                        # In passthrough mode, only override when lightning channel is nonzero (> 0)
-                        if not self.state.passthrough_enabled or val > 0:
-                            univ_buffers[univ][slot] = val
+                    offsets = (
+                        offset_or_list
+                        if isinstance(offset_or_list, (list, tuple))
+                        else [offset_or_list]
+                    )
+                    for dmx_offset in offsets:
+                        univ = self.state.start_universe + (dmx_offset // MAX_PIXELS_PER_UNIVERSE)
+                        slot = dmx_offset % MAX_PIXELS_PER_UNIVERSE
+                        if univ in univ_buffers and slot < MAX_PIXELS_PER_UNIVERSE:
+                            # In passthrough mode, only override when lightning channel is nonzero (> 0)
+                            if not self.state.passthrough_enabled or val > 0:
+                                univ_buffers[univ][slot] = val
             for univ in self.universes:
                 self.sender[univ].dmx_data = bytes(univ_buffers[univ])
         else:

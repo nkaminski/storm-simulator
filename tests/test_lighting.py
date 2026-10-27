@@ -94,6 +94,36 @@ def test_lighting_channel_map_routing():
     assert dmx_output[0] == 0
 
 
+def test_lighting_channel_map_grouped_channels():
+    # 5 simulated pixels with grouped DMX outputs matching user setup:
+    # 0 -> 44 (Ch 45), 1 -> 45 (Ch 46), 2 -> 46 (Ch 47)
+    # 3 -> 87, 88, 89 (Ch 88-90)
+    # 4 -> 92, 93, 94 (Ch 93-95)
+    mapping = {
+        0: 44,
+        1: 45,
+        2: 46,
+        3: [87, 88, 89],
+        4: [92, 93, 94],
+    }
+    state = StormState(pixels=5, intensity=1.0, channel_map=mapping)
+    engine = E131LightingEngine(state)
+    engine._configure_universes(5)
+
+    # Strike with epicenter at right side (1.0) -> illuminates pixel 4
+    strike = PhysicsEngine.generate_strike(
+        state, now=10.0, forced_dist=0.1, forced_epicenter=1.0
+    )
+    engine.trigger_flash(strike)
+    engine.render_frame(10.02)
+
+    dmx_output = engine.sender[engine.universes[0]].dmx_data
+    # Pixel 4 group (DMX 93, 94, 95 -> slots 92, 93, 94) should all be illuminated equally
+    assert dmx_output[92] > 0
+    assert dmx_output[92] == dmx_output[93] == dmx_output[94]
+
+
+
 def test_passthrough_conditional_nonzero_override_sequential():
     state = StormState(pixels=4, intensity=0.7, passthrough_listen="0.0.0.0:5568")
     engine = E131LightingEngine(state)
