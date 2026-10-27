@@ -2,6 +2,9 @@
 
 Physics-accurate E1.31 sACN lighting and spatial audio thunderstorm simulator with customizable channel mapping, integrated desktop visualizer UI, and automated procedural synthesis fallback.
 
+> [!NOTE]
+> This project, including its physical modeling, DSP audio synthesis, lighting engine, and test bench, was produced in substantial capacity using generative AI.
+
 ---
 
 ## Features
@@ -262,3 +265,9 @@ To run the test suite:
 ```bash
 pytest
 ```
+
+---
+
+## Generative AI Attribution
+
+This project was produced in substantial capacity using generative AI, assisting with mathematical modeling, physical DSP synthesis, E1.31 sACN network architecture, and testing.
