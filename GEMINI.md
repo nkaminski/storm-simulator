@@ -64,17 +64,13 @@ src/storm_sim/
   3. Multi-channel fixture grouping (mapping multiple DMX channels to a single simulation channel so grouped lights ignite simultaneously).
   4. Both 0-based (`0..N-1`) and 1-based (`1..N`) simulator channel indexing.
 
-### Rule 5: Audio Engine Startup vs. Runtime Constraints
-- The `--small-speakers` option is an engine startup parameter because it determines soundbank generation and synthesis filter topologies at initialization.
-- Do not attempt to add dynamic runtime toggles in the GUI without properly re-synthesizing and swapping the underlying audio sample soundbank.
-
-### Rule 6: Fast, Snappy Optical Envelopes
+### Rule 5: Fast, Snappy Optical Envelopes
 - Flashes must feel explosive and dramatic:
   - Full 255 DMX white saturation for close and mid-distance strikes ($d \le 1.2\text{ mi}$).
   - Diffuse cloud forward scattering floor (`DIFFUSE_SCATTERING_FLOOR = 0.20`) ensuring all fixtures across the rig illuminate together.
   - Snappy decay ($k = 4.2$) so pulses strike aggressively and decay within $150–200\text{ ms}$ before secondary return restrikes ignite.
 
-### Rule 7: Test Suite Discipline
+### Rule 6: Test Suite Discipline
 - Every pull request or commit must pass 100% of tests:
   ```bash
   pytest
