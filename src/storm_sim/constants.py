@@ -37,6 +37,9 @@ DEFAULT_MASTER_BRIGHTNESS: float = 1.0
 #: Master audio output volume multiplier [0.0 to 1.0]
 DEFAULT_MASTER_VOLUME: float = 1.0
 
+#: Default background rain audio level [0.0 = no rain, 1.0 = maximum rain]
+DEFAULT_RAIN_LEVEL: float = 0.0
+
 #: Default directory for audio sample WAV files
 DEFAULT_ASSETS_DIR: str = "./assets"
 
@@ -190,8 +193,8 @@ AUDIO_SAMPLE_RATE: int = 44100
 #: Low-latency callback buffer block size in sample frames
 AUDIO_BLOCK_SIZE: int = 1024
 
-#: Reference distance (miles) for line-source cylindrical acoustic attenuation
-ACOUSTIC_REF_DIST_MILES: float = 0.25
+#: Reference distance (miles) for line-source cylindrical acoustic attenuation (0 dBFS ceiling within 1.0 mile)
+ACOUSTIC_REF_DIST_MILES: float = 1.0
 
 #: Cylindrical line-source spreading loss coefficient (dB per decade of distance)
 ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR: float = 11.0
@@ -206,7 +209,7 @@ MIN_LPF_CUTOFF_HZ: float = 95.0
 MAX_LPF_CUTOFF_HZ: float = 2800.0
 
 #: Reference numerator for distance-dependent low-pass filter cutoff calculation
-LPF_REFERENCE_NUMERATOR_HZ: float = 1200.0
+LPF_REFERENCE_NUMERATOR_HZ: float = 2800.0
 
 #: High-frequency roll-off factor per mile of distance
 LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.25
@@ -215,19 +218,19 @@ LPF_DISTANCE_ROLLOFF_FACTOR: float = 1.25
 BUTTERWORTH_FILTER_ORDER: int = 2
 
 #: Upper distance limit (miles) for Tier 1: close overhead thunderclaps
-TIER_CLOSE_MAX_MILES: float = 0.85
+TIER_CLOSE_MAX_MILES: float = 1.0
 
 #: Upper distance limit (miles) for Tier 2: rolling mid-distance thunder
 TIER_MID_MAX_MILES: float = 2.0
 
-#: Target peak normalized amplitude for audio sample banks
-SAMPLE_PEAK_NORMALIZE_TARGET: float = 0.90
+#: Target peak normalized amplitude for audio sample banks (0 dBFS = 1.0)
+SAMPLE_PEAK_NORMALIZE_TARGET: float = 1.0
 
 #: Base volume gain scalar for continuous background rain bed relative to thunder
 RAIN_BED_BASE_GAIN: float = 0.06
 
-#: Safety ceiling clipping limit preventing DAC distortion or digital wrap-around
-AUDIO_OUTPUT_CLIP_LIMIT: float = 0.98
+#: Safety ceiling clipping limit preventing DAC distortion or digital wrap-around (0 dBFS = 1.0)
+AUDIO_OUTPUT_CLIP_LIMIT: float = 1.0
 
 
 # ==============================================================================

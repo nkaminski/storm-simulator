@@ -169,12 +169,14 @@ class PhysicsEngine:
         # reflecting the multi-kilometer vertical/horizontal lightning channel.
         # LPF: High frequencies are absorbed over distance, leaving deep sub-bass rumbles.
         audio_delay = d / SPEED_OF_SOUND_MILES_PER_SEC
-        eff_d = max(ACOUSTIC_REF_DIST_MILES, d)
-        loss_db = -ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR * math.log10(
-            eff_d / ACOUSTIC_REF_DIST_MILES
-        )
-        gain_db = loss_db + (INTENSITY_ACOUSTIC_BOOST_DB * state.intensity)
-        audio_gain = max(0.05, min(1.0, math.pow(10.0, gain_db / 20.0)))
+        if d <= ACOUSTIC_REF_DIST_MILES:
+            audio_gain = 1.0
+        else:
+            loss_db = -ACOUSTIC_CYLINDRICAL_SPREADING_FACTOR * math.log10(
+                d / ACOUSTIC_REF_DIST_MILES
+            )
+            gain_db = loss_db + (INTENSITY_ACOUSTIC_BOOST_DB * state.intensity)
+            audio_gain = max(0.05, min(1.0, math.pow(10.0, gain_db / 20.0)))
 
         lpf_hz = max(
             MIN_LPF_CUTOFF_HZ,

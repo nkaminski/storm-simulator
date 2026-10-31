@@ -41,7 +41,7 @@ def test_synthesize_thunder_small_speakers():
     assert audio.ndim == 1
     assert audio.dtype == np.float32
     assert len(audio) > 0
-    assert np.max(np.abs(audio)) <= 0.98
+    assert np.max(np.abs(audio)) <= 1.0
 
 
 def test_synthesize_thunder_explosion_attack():
@@ -51,7 +51,7 @@ def test_synthesize_thunder_explosion_attack():
     assert isinstance(att, np.ndarray)
     assert len(att) > 0
     audio_close = synth.synthesize_thunder("close")
-    assert np.max(np.abs(audio_close)) <= 0.98
+    assert np.max(np.abs(audio_close)) <= 1.0
 
 
 def test_storm_synth_cli_parsing():

@@ -20,7 +20,7 @@ def test_storm_state_defaults():
     assert state.running is True
     assert not state.is_zero_intensity
     assert state.effective_rate_per_sec > 0
-    assert state.effective_rain_level > 0
+    assert state.effective_rain_level == 0.0
     assert state.channel_map is None
 
 

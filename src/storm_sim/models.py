@@ -23,6 +23,7 @@ from .constants import (
     DEFAULT_PASSTHROUGH_BIND,
     DEFAULT_PASSTHROUGH_PORT,
     DEFAULT_PIXELS,
+    DEFAULT_RAIN_LEVEL,
     DEFAULT_START_UNIVERSE,
     INTENSITY_RATE_EXPONENT,
     INTENSITY_RAIN_EXPONENT,
@@ -199,16 +200,13 @@ class StormState:
         """Calculates current background rain audio volume [0.0 to 1.0].
 
         Returns 0.0 immediately if storm intensity is zero. If a manual rain override
-        is set, uses that value; otherwise computes volume via non-linear power-law scaling:
-            rain = intensity ^ INTENSITY_RAIN_EXPONENT
+        is set, uses that value; otherwise defaults to DEFAULT_RAIN_LEVEL (0.0 = no rain).
         """
         if self.is_zero_intensity:
             return 0.0
         if self.override_rain is not None:
             return max(0.0, min(1.0, self.override_rain))
-        return math.pow(
-            max(0.0, min(1.0, self.intensity)), INTENSITY_RAIN_EXPONENT
-        )
+        return DEFAULT_RAIN_LEVEL
 
 
 

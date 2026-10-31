@@ -458,7 +458,7 @@ class ThunderSynthesizer:
         # Models discrete specular reflections off nearby/mid-field building facades
         # and structures plus diffuse urban canyon / terrain late reverberation.
         # ----------------------------------------------------------------------
-        low_body = (sub_layer * 0.85) + (mid_layer * 0.35)
+        low_body = (sub_layer * 0.92) + (mid_layer * 0.30)
         rev_body = self._apply_environmental_reflections(low_body, tier)
         rev_body = rev_body / max(float(np.max(np.abs(rev_body))), 1e-6)
 
@@ -468,10 +468,10 @@ class ThunderSynthesizer:
             rev_crack = np.tanh(rev_crack * 1.35)
             rev_crack = rev_crack / max(float(np.max(np.abs(rev_crack))), 1e-6)
             if tier == "close":
-                # Keep scary infrasonic/sub-bass strong (0.68) alongside dry-thunder3.wav sharp crack (1.05)
-                composite = (rev_body * 0.68) + (rev_crack * 1.05)
+                # Keep infrasonic/sub-bass dominant (1.0) alongside dry-thunder3.wav sharp crack (0.72)
+                composite = (rev_body * 1.0) + (rev_crack * 0.72)
             else:
-                composite = (rev_body * 0.82) + (rev_crack * 0.58)
+                composite = (rev_body * 0.95) + (rev_crack * 0.52)
         else:
             composite = rev_body
 
@@ -483,9 +483,33 @@ class ThunderSynthesizer:
             output="sos",
         )
         composite = signal.sosfilt(sos_master_lpf, composite)
-        peak = float(np.max(np.abs(composite)))
-        normalized = (composite / max(peak, 1e-6)) * SAMPLE_PEAK_NORMALIZE_TARGET
-        return normalized.astype(np.float32)
+
+        # Ensure the infrasonic/sub-bass core (<100 Hz, or <140 Hz for compact speakers)
+        # peaks at/near 0 dBFS, soft-limiting any brief high-frequency crack transients.
+        infra_cutoff_hz = min(
+            140.0 if self.small_speakers else 100.0,
+            0.45 * self.sample_rate,
+        )
+        sos_infra_norm = signal.butter(
+            2, infra_cutoff_hz, btype="low", fs=self.sample_rate, output="sos"
+        )
+        infra_sig = signal.sosfilt(sos_infra_norm, composite)
+        infra_peak = float(np.max(np.abs(infra_sig)))
+        target = SAMPLE_PEAK_NORMALIZE_TARGET
+        if infra_peak > 1e-6:
+            composite = composite * ((target * 1.04) / infra_peak)
+        else:
+            peak = float(np.max(np.abs(composite)))
+            composite = (composite / max(peak, 1e-6)) * target
+
+        knee = 0.88 * target
+        headroom = max(target - knee, 1e-6)
+        abs_comp = np.abs(composite)
+        mask_k = abs_comp > knee
+        composite[mask_k] = np.sign(composite[mask_k]) * (
+            knee + headroom * np.tanh((abs_comp[mask_k] - knee) / headroom)
+        )
+        return np.clip(composite, -target, target).astype(np.float32)
 
     def _apply_crack_building_echoes(
         self, crack: np.ndarray, tier: str

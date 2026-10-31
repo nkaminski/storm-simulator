@@ -207,9 +207,9 @@ class AudioEngine:
         if self.state.is_zero_intensity:
             return
 
-        if strike.distance_miles < TIER_CLOSE_MAX_MILES:
+        if strike.distance_miles <= TIER_CLOSE_MAX_MILES:
             tier = "close"
-        elif strike.distance_miles < TIER_MID_MAX_MILES:
+        elif strike.distance_miles <= TIER_MID_MAX_MILES:
             tier = "mid"
         else:
             tier = "far"
@@ -261,6 +261,32 @@ class AudioEngine:
             span_2 = n_samples - delay_2
             stereo_buf[delay_2:, 0] += ref_sig[:span_2] * (gain_2 * math.cos(theta_2))
             stereo_buf[delay_2:, 1] += ref_sig[:span_2] * (gain_2 * math.sin(theta_2))
+
+        # Normalize post-LPF, post-pan stereo voice so the infrasonic/sub-bass core (<100 Hz)
+        # of strikes within reference distance reaches at/near 0 dBFS (1.0 peak), with
+        # soft-knee limiting on brief high-frequency crack spikes to prevent clipping.
+        target_peak = min(
+            1.0, strike.audio_gain_linear * SAMPLE_PEAK_NORMALIZE_TARGET
+        )
+        infra_cutoff = 140 if self.small_speakers else 100
+        sos_infra = _get_cached_butterworth_sos(infra_cutoff, AUDIO_SAMPLE_RATE)
+        infra_buf = signal.sosfilt(sos_infra, stereo_buf, axis=0)
+        infra_peak = float(np.max(np.abs(infra_buf)))
+        if infra_peak > 1e-6:
+            stereo_buf *= (target_peak * 1.05) / infra_peak
+        else:
+            peak = float(np.max(np.abs(stereo_buf)))
+            if peak > 1e-6:
+                stereo_buf *= target_peak / peak
+
+        knee = 0.88 * target_peak
+        headroom = max(target_peak - knee, 1e-6)
+        abs_buf = np.abs(stereo_buf)
+        mask_k = abs_buf > knee
+        stereo_buf[mask_k] = np.sign(stereo_buf[mask_k]) * (
+            knee + headroom * np.tanh((abs_buf[mask_k] - knee) / headroom)
+        )
+        np.clip(stereo_buf, -target_peak, target_peak, out=stereo_buf)
 
         with self.lock:
             self.active_voices.append((stereo_buf, 0))

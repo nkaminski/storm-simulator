@@ -25,11 +25,11 @@ def test_ui_rain_slider_immediate_override():
         assert state.override_rain == 0.0
         assert state.effective_rain_level == 0.0
 
-        # Unchecking manual overrides re-couples back to auto intensity
+        # Unchecking manual overrides resets back to default (0.0 = no rain)
         ui.var_override_enable.set(False)
         ui._on_toggle_overrides()
         assert state.override_rain is None
-        assert state.effective_rain_level > 0.0
+        assert state.effective_rain_level == 0.0
         assert "Auto" in ui.lbl_rain_val.cget("text")
     finally:
         coord.stop()
